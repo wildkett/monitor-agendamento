@@ -1,0 +1,60 @@
+name: Monitor de vagas - agendamento médico
+
+on:
+  schedule:
+    # A cada 20 minutos. O GitHub não garante o horário exato em épocas de
+    # alta demanda, mas na prática costuma rodar perto disso.
+    - cron: "*/20 * * * *"
+  workflow_dispatch: {} # permite rodar manualmente pela aba Actions
+
+permissions:
+  contents: write # necessário para o job commitar o state.json atualizado
+
+jobs:
+  verificar-vagas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Instalar navegador do Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Rodar verificação
+        env:
+          AGENDA_URL: ${{ secrets.AGENDA_URL }}
+          CONVENIO: ${{ secrets.CONVENIO }}
+          MATRICULA: ${{ secrets.MATRICULA }}
+          NOME_COMPLETO: ${{ secrets.NOME_COMPLETO }}
+          DATA_NASCIMENTO: ${{ secrets.DATA_NASCIMENTO }}
+          CPF: ${{ secrets.CPF }}
+          SEXO: ${{ secrets.SEXO }}
+          EMAIL: ${{ secrets.EMAIL }}
+          TELEFONE: ${{ secrets.TELEFONE }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: npm start
+
+      - name: Guardar screenshot de erro (se houver)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: erro-debug
+          path: erro-debug.png
+          if-no-files-found: ignore
+
+      - name: Salvar estado atualizado
+        if: always()
+        run: |
+          git config user.name "monitor-bot"
+          git config user.email "monitor-bot@users.noreply.github.com"
+          git add state.json
+          git diff --cached --quiet || git commit -m "Atualiza estado do monitoramento [skip ci]"
+          git push

@@ -1,0 +1,13 @@
+{
+  "name": "monitor-agendamento-medico",
+  "version": "1.0.0",
+  "description": "Monitora um site de agendamento médico e alerta no Telegram quando abre vaga na especialidade e período desejados.",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "inspecionar": "playwright codegen $AGENDA_URL"
+  },
+  "dependencies": {
+    "playwright": "^1.47.0"
+  }
+}
