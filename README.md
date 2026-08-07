@@ -5,53 +5,83 @@ Telegram quando abre uma vaga dentro do período e da especialidade que você
 configurar. Roda sozinho na nuvem via GitHub Actions — não precisa deixar
 seu computador ligado.
 
-## ⚠️ Antes de tudo: os seletores precisam ser ajustados
-
-O site (`site-do-convenio.com.br`) é um sistema JSF/PrimeFaces: várias telas
-só aparecem depois de uma ação via JavaScript (escolher convênio, digitar
-matrícula, etc). Eu não consigo abrir esse site num navegador daqui para
-descobrir os seletores exatos de cada campo, então marquei com `// TODO`
-os dois arquivos que dependem disso:
-
-- `src/login.js` — tela de convênio/matrícula/dados pessoais
-- `src/verificarEspecialidade.js` — seleção de especialidade e leitura da agenda
-
-### Como descobrir os seletores certos
-
-1. Instale as dependências (veja seção abaixo).
-2. Rode:
-   ```bash
-   AGENDA_URL="https://site-do-convenio.com.br/Agenda" npm run inspecionar
-   ```
-3. Uma janela do Chrome abre junto com o **Playwright Inspector**, gravando
-   tudo que você clicar.
-4. Faça o fluxo manualmente, do jeito que você faria normalmente:
-   escolher convênio → digitar matrícula → confirmar dados → escolher
-   Cardiologia → abrir a agenda/calendário.
-5. O Inspector mostra ao vivo o código correspondente a cada clique
-   (ex: `await page.getByLabel('Matrícula').fill('123456')`).
-6. Copie esses trechos para dentro das funções `login()` e
-   `verificarEspecialidade()`, no lugar dos `TODO`.
-
-Preste atenção especial em como a agenda mostra os horários livres — se é
-uma lista/tabela ou um calendário com dias destacados — porque o trecho que
-lê as vagas em `verificarEspecialidade.js` depende disso.
-
 ## Configurar localmente (para testar)
 
 ```bash
 npm install
 npx playwright install --with-deps chromium
-cp .env.example .env
-# preencha o .env com seus dados
-node -r dotenv/config src/index.js  # ou use um pacote como dotenv-cli
+node -r dotenv/config src/index.js
 ```
+
+Crie um arquivo `.env` na raiz com as variáveis abaixo, preenchendo com os
+seus dados. Ele está no `.gitignore` e nunca deve ser commitado — são os
+mesmos valores que vão nos secrets do GitHub (veja a tabela adiante).
+
+```
+AGENDA_URL=https://site-do-convenio.com.br/Agenda
+CONVENIO=Convênio Exemplo
+MATRICULA=
+NOME_COMPLETO=
+DATA_NASCIMENTO=
+CPF=
+SEXO=
+EMAIL=
+TELEFONE=
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+```
+
+### Se algo quebrar
+
+O site é JSF/PrimeFaces e pode mudar os seletores. Duas ferramentas ajudam:
+
+```bash
+# abre o Chrome na tela, em câmera lenta, para acompanhar o fluxo
+set HEADLESS=false&& node -r dotenv/config src/index.js
+
+# mostra quantas linhas foram lidas e quantas caíram no período
+set DEBUG_VAGAS=1&& node -r dotenv/config src/index.js
+```
+
+Quando uma especialidade falha, um `erro-<especialidade>.png` é salvo na
+raiz junto com a URL do momento do erro. Esses screenshots mostram seus
+dados pessoais preenchidos, por isso `erro-*.png` está no `.gitignore`.
+
+Para redescobrir seletores do zero, grave o fluxo manualmente:
+
+```bash
+AGENDA_URL="https://site-do-convenio.com.br/Agenda" npm run inspecionar
+```
+
+Dois detalhes desse site que já custaram tempo e vale conhecer:
+
+- **Campos com máscara** (CPF e Telefone) ignoram `fill()` e ficam vazios —
+  o formulário então não valida e o "Avançar" não sai da tela inicial. Use
+  `pressSequentially()` com apenas os dígitos, como em `src/login.js`.
+- **O modal** que abre após o login tem ID dinâmico (`j_idt294`,
+  `j_idt295`...), e o PrimeFaces deixa vários `.ui-dialog` escondidos no
+  HTML desde o carregamento. O seletor precisa do `:visible`, senão pega um
+  modal invisível e a máscara `.ui-widget-overlay` continua bloqueando os
+  cliques da tela seguinte.
 
 ## Configurar no GitHub (para rodar sozinho)
 
-1. Crie um repositório novo (pode ser privado — recomendado, já que os
-   secrets guardam a sua matrícula e dados pessoais) e suba este projeto.
-2. Em **Settings → Secrets and variables → Actions**, crie estes secrets:
+1. Crie um repositório **privado** e suba este projeto.
+
+   Isso não é opcional. Os secrets em si são criptografados e não vazariam
+   nem em repositório público — o problema são outros dois arquivos:
+
+   - Quando uma execução falha, o workflow publica `erro-debug.png` como
+     artifact. Esse screenshot mostra o formulário preenchido, com nome
+     completo, matrícula, CPF, data de nascimento, e-mail e telefone
+     legíveis. Em repo público, artifacts são baixáveis por qualquer pessoa.
+   - O `state.json` é commitado a cada execução e revela quais exames e
+     especialidades você acompanha.
+
+2. Em **Settings → Secrets and variables → Actions**, aba **Secrets**, crie
+   estes como **Repository secrets** (não "Environment secrets" — o job não
+   declara `environment:`, então secrets de environment chegariam vazios e a
+   execução falharia com "variável de ambiente obrigatória não definida"):
 
    | Secret | Exemplo |
    |---|---|

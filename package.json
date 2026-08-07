@@ -8,6 +8,7 @@
     "inspecionar": "playwright codegen $AGENDA_URL"
   },
   "dependencies": {
+    "dotenv": "^17.4.2",
     "playwright": "^1.47.0"
   }
 }

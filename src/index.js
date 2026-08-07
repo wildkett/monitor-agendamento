@@ -9,7 +9,12 @@ async function main() {
   const config = carregarConfig();
   const estado = carregarEstado();
 
-  const browser = await chromium.launch({ headless: true });
+  // HEADLESS=false abre o navegador na tela — útil pra depurar o fluxo
+  const visivel = (process.env.HEADLESS ?? "").trim() === "false";
+  const browser = await chromium.launch({
+    headless: !visivel,
+    slowMo: visivel ? 500 : 0,
+  });
   const page = await browser.newPage();
 
   try {
@@ -41,6 +46,10 @@ async function main() {
         atualizarEstado(estado, nome, vagas);
       } catch (erroEspecialidade) {
         console.error(`Erro ao verificar "${nome}":`, erroEspecialidade.message);
+        console.error(`  URL no momento do erro: ${page.url()}`);
+        await page
+          .screenshot({ path: `erro-${nome.replace(/\W+/g, "-")}.png`, fullPage: true })
+          .catch(() => {});
         // Continua para as próximas especialidades mesmo se uma falhar
       }
     }

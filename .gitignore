@@ -1,3 +1,5 @@
 node_modules/
 .env
-erro-debug.png
+# Screenshots de erro mostram o formulário preenchido (nome, CPF, matrícula,
+# telefone) — nunca devem ser commitados.
+erro-*.png

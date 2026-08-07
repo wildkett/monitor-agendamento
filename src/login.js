@@ -1,54 +1,77 @@
-/**
- * Faz o login inicial no site de agendamento: escolhe o convênio, informa a
- * matrícula e confirma os dados pessoais que a plataforma carrega.
- *
- * ATENÇÃO: os seletores abaixo (marcados com TODO) são placeholders.
- * O site é feito em JSF/PrimeFaces e os campos só existem depois de
- * carregamento via AJAX, então não dá pra descobrir os IDs reais sem abrir
- * o site num navegador de verdade.
- *
- * Como pegar os seletores certos:
- *   1. Rode:  AGENDA_URL="https://site-do-convenio.com.br/Agenda" npm run inspecionar
- *   2. Uma janela do Chrome abre gravando tudo que você clicar.
- *   3. Faça o fluxo manualmente: escolha o convênio, digite a matrícula,
- *      confirme os dados, clique em "Avançar".
- *   4. O Playwright Inspector mostra, ao vivo, o código de cada ação
- *      (ex: `await page.getByLabel('Matrícula').fill('123')`).
- *   5. Copie esses trechos aqui, substituindo os TODOs.
- */
 export async function login(page, config) {
   await page.goto(config.agendaUrl, { waitUntil: "networkidle" });
 
-  // TODO: selecionar o convênio (radio/dropdown "Convênio Exemplo" ou "Particular")
-  // Exemplo depois de gravar com codegen:
-  // await page.getByLabel(config.convenio).check();
-  await page.getByText(config.convenio, { exact: false }).click();
+  // Preenche matrícula
+  await page.getByRole('textbox', { name: 'Matrícula:' }).click();
+  await page.getByRole('textbox', { name: 'Matrícula:' }).fill(config.matricula);
 
-  // TODO: preencher a matrícula
-  // await page.getByLabel('Matrícula').fill(config.matricula);
-  await page.getByLabel("Matrícula", { exact: false }).fill(config.matricula);
+  // Seleciona convênio (após preencher matrícula)
+  await page.getByText(`Selecione o Convênio: ${config.convenio}`).click();
 
-  // O site busca os dados do beneficiário no banco do convênio - esperar
-  // o loading sumir antes de continuar.
-  await page
-    .getByText("Conectando no Banco de Dados", { exact: false })
-    .waitFor({ state: "hidden", timeout: 30000 })
-    .catch(() => {
-      // se esse texto não existir/mudar, não trava o fluxo por causa disso
-    });
+  // CPF e telefone são os únicos campos que o site não preenche sozinho, e os
+  // dois têm máscara: fill() joga o texto de uma vez e a máscara descarta,
+  // deixando o campo vazio. pressSequentially digita tecla a tecla, que é o
+  // que a máscara espera — e só com os dígitos, sem pontuação.
+  const cpf = page.getByRole('textbox', { name: 'CPF:' });
+  await cpf.click();
+  await cpf.pressSequentially(somenteDigitos(config.cpf), { delay: 50 });
 
-  // TODO: confirmar/preencher os dados pessoais, caso não venham
-  // automaticamente preenchidos pela busca da matrícula.
-  // await page.getByLabel('Nome Completo').fill(config.nomeCompleto);
-  // await page.getByLabel('Data de Nascimento').fill(config.dataNascimento);
-  // await page.getByLabel('CPF').fill(config.cpf);
-  // await page.getByLabel(config.sexo).check();
-  // await page.getByLabel('E-mail').fill(config.email);
-  // await page.getByLabel('Telefone Celular').fill(config.telefone);
+  const telefone = page.getByRole('textbox', { name: 'Telefone Celular:' });
+  await telefone.click();
+  await telefone.pressSequentially(somenteDigitos(config.telefone), { delay: 50 });
 
-  // TODO: clicar em avançar
-  // await page.getByRole('button', { name: 'Avançar' }).click();
+  // Clica em Avançar
   await page.getByRole("button", { name: "Avançar" }).click();
 
+  await fecharModal(page);
+
   await page.waitForLoadState("networkidle");
+
+  // Se algum campo obrigatório não passar na validação, o site simplesmente
+  // não sai da tela inicial — melhor falhar aqui com uma mensagem clara do que
+  // estourar timeout lá na frente procurando o dropdown de especialidade.
+  const dropdown = page.locator('[id="frmInicial:group"]');
+  await dropdown.waitFor({ state: "visible", timeout: 15000 }).catch(() => {
+    throw new Error(
+      "O login não avançou da tela inicial — algum campo obrigatório não foi " +
+        "aceito. Rode com HEADLESS=false para ver o formulário."
+    );
+  });
+}
+
+function somenteDigitos(valor) {
+  return valor.replace(/\D/g, "");
+}
+
+/**
+ * Depois do "Avançar" o site abre um modal listando os agendamentos que a
+ * pessoa já tem. Ele precisa ser fechado, senão a máscara do PrimeFaces
+ * (.ui-widget-overlay) intercepta todos os cliques da tela seguinte.
+ *
+ * O ID do modal é dinâmico (j_idt294, j_idt295...) e o PrimeFaces já deixa
+ * vários .ui-dialog escondidos no HTML desde o carregamento — por isso o
+ * seletor precisa do :visible, senão pega um modal invisível.
+ */
+async function fecharModal(page) {
+  const modal = page.locator(".ui-dialog:visible").first();
+
+  // O modal chega por AJAX, então pode demorar um instante pra aparecer.
+  const apareceu = await modal
+    .waitFor({ state: "visible", timeout: 10000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!apareceu) return; // sem agendamentos prévios, o modal nem aparece
+
+  // O "X" da barra de título é um <a role="button" aria-label="Close">
+  await modal.locator("a.ui-dialog-titlebar-close").click();
+
+  await page
+    .locator(".ui-widget-overlay")
+    .waitFor({ state: "hidden", timeout: 10000 })
+    .catch(() => {
+      throw new Error(
+        "O modal de agendamentos não fechou — a máscara continua bloqueando a tela."
+      );
+    });
 }
