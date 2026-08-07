@@ -1,24 +1,33 @@
 export async function login(page, config) {
   await page.goto(config.agendaUrl, { waitUntil: "networkidle" });
 
-  // Preenche matrícula
-  await page.getByRole('textbox', { name: 'Matrícula:' }).click();
-  await page.getByRole('textbox', { name: 'Matrícula:' }).fill(config.matricula);
+  await preencherComMascara(
+    page.getByRole("textbox", { name: "Matrícula:" }),
+    config.matricula,
+    "Matrícula"
+  );
 
   // Seleciona convênio (após preencher matrícula)
   await page.getByText(`Selecione o Convênio: ${config.convenio}`).click();
 
-  // CPF e telefone são os únicos campos que o site não preenche sozinho, e os
-  // dois têm máscara: fill() joga o texto de uma vez e a máscara descarta,
-  // deixando o campo vazio. pressSequentially digita tecla a tecla, que é o
-  // que a máscara espera — e só com os dígitos, sem pontuação.
-  const cpf = page.getByRole('textbox', { name: 'CPF:' });
-  await cpf.click();
-  await cpf.pressSequentially(somenteDigitos(config.cpf), { delay: 50 });
+  // Com a matrícula preenchida, o site consulta o banco do convênio e traz
+  // nome, data de nascimento e e-mail sozinho. Esperar esse retorno antes de
+  // seguir — se pularmos, o formulário vai para validação ainda incompleto.
+  await esperarPreenchido(
+    page.getByRole("textbox", { name: "Nome Completo:" }),
+    "Nome Completo"
+  );
 
-  const telefone = page.getByRole('textbox', { name: 'Telefone Celular:' });
-  await telefone.click();
-  await telefone.pressSequentially(somenteDigitos(config.telefone), { delay: 50 });
+  await preencherComMascara(
+    page.getByRole("textbox", { name: "CPF:" }),
+    config.cpf,
+    "CPF"
+  );
+  await preencherComMascara(
+    page.getByRole("textbox", { name: "Telefone Celular:" }),
+    config.telefone,
+    "Telefone Celular"
+  );
 
   // Clica em Avançar
   await page.getByRole("button", { name: "Avançar" }).click();
@@ -41,6 +50,68 @@ export async function login(page, config) {
 
 function somenteDigitos(valor) {
   return valor.replace(/\D/g, "");
+}
+
+/**
+ * Matrícula, CPF e Telefone têm máscara de entrada, que é sensível de duas
+ * formas:
+ *
+ *   - fill() joga o texto de uma vez e a máscara descarta, deixando o campo
+ *     vazio (foi o que aconteceu com a matrícula na execução do GitHub);
+ *   - se a digitação começar antes do JavaScript da máscara terminar de
+ *     inicializar, ela reposiciona o cursor no meio do caminho e os dígitos
+ *     saem fora de ordem. Na nuvem isso fazia o primeiro dígito do CPF ser
+ *     empurrado até o fim, invalidando o número inteiro.
+ *
+ * Não adianta forçar a posição do cursor: o campo já contém o gabarito inteiro
+ * ("__.___.__._____.__-_") e a máscara gerencia o cursor sozinha. O que
+ * funciona é digitar, conferir o resultado e repetir se saiu errado — o que
+ * cobre a corrida de inicialização sem depender da velocidade da máquina.
+ */
+async function preencherComMascara(campo, valor, rotulo) {
+  const digitos = somenteDigitos(valor);
+  const TENTATIVAS = 3;
+  let ultimoResultado = "";
+
+  for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
+    await campo.click();
+    await campo.press("Control+a");
+    await campo.press("Backspace");
+
+    await campo.pressSequentially(digitos, { delay: 60 });
+
+    // A máscara insere pontuação, então a conferência é só nos dígitos.
+    ultimoResultado = somenteDigitos(await campo.inputValue());
+    if (ultimoResultado === digitos) return;
+
+    // Dá um tempo para a máscara terminar de inicializar antes de repetir.
+    await campo.page().waitForTimeout(1000 * tentativa);
+  }
+
+  throw new Error(
+    `O campo "${rotulo}" não recebeu o valor corretamente após ${TENTATIVAS} ` +
+      `tentativas: a máscara resultou em "${ultimoResultado}" no lugar de ` +
+      `"${digitos}". Confira o secret correspondente.`
+  );
+}
+
+/**
+ * Os campos que o site preenche sozinho a partir da matrícula chegam por AJAX.
+ * Em máquina local isso é quase instantâneo, mas no runner do GitHub demora o
+ * suficiente para o resto do fluxo passar na frente.
+ */
+async function esperarPreenchido(campo, rotulo) {
+  const limite = Date.now() + 30000;
+
+  while (Date.now() < limite) {
+    if ((await campo.inputValue()).trim() !== "") return;
+    await campo.page().waitForTimeout(500);
+  }
+
+  throw new Error(
+    `O site não preencheu "${rotulo}" a partir da matrícula. A matrícula pode ` +
+      `estar incorreta, ou a consulta ao convênio falhou/demorou demais.`
+  );
 }
 
 /**
