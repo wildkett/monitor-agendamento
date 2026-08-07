@@ -88,10 +88,20 @@ async function preencherComMascara(campo, valor, rotulo) {
     await campo.page().waitForTimeout(1000 * tentativa);
   }
 
+  // A mensagem descreve o sintoma sem incluir os valores: ela vai para o log
+  // do GitHub Actions, e o mascaramento automático de secrets só cobre o que
+  // casa exatamente com o valor cadastrado — o texto embaralhado pela máscara
+  // não casaria com nada e apareceria em claro.
+  const diagnostico =
+    ultimoResultado.length === 0
+      ? "o campo ficou vazio"
+      : ultimoResultado.length !== digitos.length
+        ? `entraram ${ultimoResultado.length} dígito(s) em vez de ${digitos.length}`
+        : "os dígitos entraram fora de ordem";
+
   throw new Error(
-    `O campo "${rotulo}" não recebeu o valor corretamente após ${TENTATIVAS} ` +
-      `tentativas: a máscara resultou em "${ultimoResultado}" no lugar de ` +
-      `"${digitos}". Confira o secret correspondente.`
+    `O campo "${rotulo}" não foi preenchido corretamente após ${TENTATIVAS} ` +
+      `tentativas: ${diagnostico}. Confira o secret correspondente.`
   );
 }
 

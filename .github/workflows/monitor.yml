@@ -10,16 +10,23 @@ on:
 permissions:
   contents: write # necessário para o job commitar o state.json atualizado
 
+# Duas execuções ao mesmo tempo brigariam pelo push do state.json: a segunda
+# encontraria o remoto já adiantado e falharia. Enfileirar em vez de cancelar,
+# para não perder uma verificação.
+concurrency:
+  group: monitor-vagas
+  cancel-in-progress: false
+
 jobs:
   verificar-vagas:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Instalar dependências
         run: npm ci
@@ -44,11 +51,15 @@ jobs:
 
       - name: Guardar screenshot de erro (se houver)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: erro-debug
           path: erro-debug.png
           if-no-files-found: ignore
+          # O screenshot mostra o formulário preenchido (nome, CPF, matrícula,
+          # telefone). Ele só é útil nas horas seguintes à falha, então não faz
+          # sentido mantê-lo os 90 dias padrão.
+          retention-days: 3
 
       - name: Salvar estado atualizado
         if: always()
@@ -56,5 +67,9 @@ jobs:
           git config user.name "monitor-bot"
           git config user.email "monitor-bot@users.noreply.github.com"
           git add state.json
-          git diff --cached --quiet || git commit -m "Atualiza estado do monitoramento [skip ci]"
+          git diff --cached --quiet && exit 0
+          git commit -m "Atualiza estado do monitoramento [skip ci]"
+          # O remoto pode ter andado desde o checkout (um commit seu, por
+          # exemplo). Rebase antes do push evita perder a execução por isso.
+          git pull --rebase origin main
           git push
