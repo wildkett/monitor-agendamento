@@ -32,20 +32,106 @@ export async function login(page, config) {
   // Clica em Avançar
   await page.getByRole("button", { name: "Avançar" }).click();
 
-  await fecharModal(page);
-
   await page.waitForLoadState("networkidle");
+
+  // O modal de encaminhamentos/retornos é deixado ABERTO de propósito: as
+  // especialidades listadas nele saem do dropdown, e só dá para agendá-las
+  // pelo botão "Agendar" de dentro do modal. Quem decide fechar é o chamador,
+  // depois de tratar essas especialidades.
+  await modal(page)
+    .waitFor({ state: "visible", timeout: 10000 })
+    .catch(() => {}); // sem pendências, o modal nem aparece
 
   // Se algum campo obrigatório não passar na validação, o site simplesmente
   // não sai da tela inicial — melhor falhar aqui com uma mensagem clara do que
   // estourar timeout lá na frente procurando o dropdown de especialidade.
-  const dropdown = page.locator('[id="frmInicial:group"]');
-  await dropdown.waitFor({ state: "visible", timeout: 15000 }).catch(() => {
-    throw new Error(
-      "O login não avançou da tela inicial — algum campo obrigatório não foi " +
-        "aceito. Rode com HEADLESS=false para ver o formulário."
-    );
-  });
+  if (!(await modalAberto(page))) {
+    const dropdown = page.locator('[id="frmInicial:group"]');
+    await dropdown.waitFor({ state: "visible", timeout: 15000 }).catch(() => {
+      throw new Error(
+        "O login não avançou da tela inicial — algum campo obrigatório não foi " +
+          "aceito. Rode com HEADLESS=false para ver o formulário."
+      );
+    });
+  }
+}
+
+/**
+ * O modal visível da tela. O ID é dinâmico (j_idt294, j_idt295...) e o
+ * PrimeFaces deixa vários .ui-dialog escondidos no HTML desde o carregamento,
+ * por isso o :visible é obrigatório — sem ele, pega um modal invisível.
+ */
+export function modal(page) {
+  return page.locator(".ui-dialog:visible").first();
+}
+
+export async function modalAberto(page) {
+  return modal(page)
+    .isVisible()
+    .catch(() => false);
+}
+
+/**
+ * Lê as especialidades listadas no modal — tanto as "Solicitações de
+ * Encaminhamento" quanto o "Acompanhamento Médico (Retornos)". Cada linha
+ * dessas tabelas tem o nome da especialidade e um botão "Agendar".
+ *
+ * Isso importa porque essas especialidades são removidas do dropdown: para
+ * elas, o botão do modal é o único caminho.
+ */
+export async function listarEncaminhamentos(page) {
+  if (!(await modalAberto(page))) return [];
+
+  const linhas = await modal(page)
+    .locator("tr")
+    .filter({ has: page.getByRole("button", { name: "Agendar" }) })
+    .all();
+
+  const nomes = [];
+  for (const linha of linhas) {
+    // Ler a primeira célula, e não a primeira linha do texto: na tabela de
+    // retornos as colunas (especialidade, médico, dias) vêm todas na mesma
+    // linha, separadas por espaços — "OTORRINOLARINGOLOGIA NOME DO MEDICO 15".
+    const especialidade = await primeiraCelula(linha);
+    if (especialidade && especialidade !== "Agendar") nomes.push(especialidade);
+  }
+
+  return nomes;
+}
+
+async function primeiraCelula(linha) {
+  return (await linha.locator("td").first().innerText().catch(() => "")).trim();
+}
+
+/**
+ * Clica no "Agendar" da linha correspondente. O site fecha o modal e já deixa
+ * a especialidade escolhida no dropdown — resta só clicar em "Avançar".
+ */
+export async function agendarPeloModal(page, nome) {
+  const linhas = await modal(page)
+    .locator("tr")
+    .filter({ has: page.getByRole("button", { name: "Agendar" }) })
+    .all();
+
+  let alvo = null;
+  for (const linha of linhas) {
+    if ((await primeiraCelula(linha)) === nome) {
+      alvo = linha;
+      break;
+    }
+  }
+
+  if (!alvo) {
+    throw new Error(`"${nome}" não foi encontrada entre as linhas do modal.`);
+  }
+
+  await alvo.getByRole("button", { name: "Agendar" }).click();
+
+  await page
+    .locator(".ui-widget-overlay")
+    .waitFor({ state: "hidden", timeout: 15000 })
+    .catch(() => {});
+  await page.waitForLoadState("networkidle");
 }
 
 function somenteDigitos(valor) {
@@ -125,27 +211,15 @@ async function esperarPreenchido(campo, rotulo) {
 }
 
 /**
- * Depois do "Avançar" o site abre um modal listando os agendamentos que a
- * pessoa já tem. Ele precisa ser fechado, senão a máscara do PrimeFaces
- * (.ui-widget-overlay) intercepta todos os cliques da tela seguinte.
- *
- * O ID do modal é dinâmico (j_idt294, j_idt295...) e o PrimeFaces já deixa
- * vários .ui-dialog escondidos no HTML desde o carregamento — por isso o
- * seletor precisa do :visible, senão pega um modal invisível.
+ * Fecha o modal. Necessário antes de usar o dropdown, porque a máscara do
+ * PrimeFaces (.ui-widget-overlay) intercepta todos os cliques enquanto ele
+ * estiver aberto.
  */
-async function fecharModal(page) {
-  const modal = page.locator(".ui-dialog:visible").first();
-
-  // O modal chega por AJAX, então pode demorar um instante pra aparecer.
-  const apareceu = await modal
-    .waitFor({ state: "visible", timeout: 10000 })
-    .then(() => true)
-    .catch(() => false);
-
-  if (!apareceu) return; // sem agendamentos prévios, o modal nem aparece
+export async function fecharModal(page) {
+  if (!(await modalAberto(page))) return;
 
   // O "X" da barra de título é um <a role="button" aria-label="Close">
-  await modal.locator("a.ui-dialog-titlebar-close").click();
+  await modal(page).locator("a.ui-dialog-titlebar-close").click();
 
   await page
     .locator(".ui-widget-overlay")

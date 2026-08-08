@@ -20,12 +20,16 @@ export async function enviarAlertaTelegram({ botToken, chatId, mensagem }) {
 
 export function formatarMensagemVaga({ especialidade, vagas, urlAgenda }) {
   const linhas = vagas
-    .map((v) => `• ${v.data} às ${v.hora} — ${v.profissional ?? "profissional não informado"}`)
+    .map((v) => {
+      const [ano, mes, dia] = v.data.split("-");
+      const quando = v.hora ? `${dia}/${mes} às ${v.hora}` : `${dia}/${mes}/${ano}`;
+      return `• <b>${quando}</b>\n  ${v.profissional ?? "local não informado"}`;
+    })
     .join("\n");
 
   return (
-    `🩺 <b>Vaga encontrada: ${especialidade}</b>\n\n` +
+    `🩺 <b>OLHA A VAAAGAAA: ${especialidade}</b>\n\n` +
     `${linhas}\n\n` +
-    `Agende rápido, pode sumir: ${urlAgenda}`
+    `CLICA AÍ E AGENDA LOGO: ${urlAgenda}`
   );
 }

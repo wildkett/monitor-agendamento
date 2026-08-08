@@ -18,9 +18,14 @@ export function salvarEstado(estado) {
   writeFileSync(CAMINHO_ESTADO, JSON.stringify(estado, null, 2) + "\n");
 }
 
-// Cria uma chave única pra cada vaga, pra saber se ela já foi notificada antes
+// Cria uma chave única pra cada vaga, pra saber se ela já foi notificada antes.
+//
+// O horário fica de fora de propósito: ele só é buscado depois, e apenas para
+// as vagas novas (custa uma navegação extra por vaga). Se entrasse na chave,
+// toda vaga já conhecida mudaria de identidade ao ganhar horário e seria
+// anunciada de novo.
 export function chaveVaga(vaga) {
-  return `${vaga.data}|${vaga.hora}|${vaga.profissional ?? ""}`;
+  return `${vaga.data}|${vaga.profissional ?? ""}`;
 }
 
 // Recebe as vagas encontradas agora e devolve só as que ainda não foram notificadas
