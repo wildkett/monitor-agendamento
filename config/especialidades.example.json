@@ -1,0 +1,12 @@
+[
+  {
+    "nome": "CARDIOLOGIA",
+    "dataInicio": "2026-01-01",
+    "dataFim": "2026-03-31"
+  },
+  {
+    "nome": "DERMATOLOGIA",
+    "dataInicio": "2026-01-01",
+    "dataFim": "2026-03-31"
+  }
+]

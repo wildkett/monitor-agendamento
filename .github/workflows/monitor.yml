@@ -2,17 +2,17 @@ name: Monitor de vagas - agendamento médico
 
 on:
   schedule:
-    # A cada 20 minutos. O GitHub não garante o horário exato em épocas de
-    # alta demanda, mas na prática costuma rodar perto disso.
+    # A cada 20 minutos. O GitHub não garante o horário exato quando está
+    # concorrido, mas na prática costuma rodar perto disso.
     - cron: "*/20 * * * *"
   workflow_dispatch: {} # permite rodar manualmente pela aba Actions
 
 permissions:
-  contents: write # necessário para o job commitar o state.json atualizado
+  contents: write # o job commita o state.json atualizado
 
 # Duas execuções ao mesmo tempo brigariam pelo push do state.json: a segunda
-# encontraria o remoto já adiantado e falharia. Enfileirar em vez de cancelar,
-# para não perder uma verificação.
+# acharia o remoto já adiantado e falharia. Enfileiro em vez de cancelar, pra
+# não perder uma verificação.
 concurrency:
   group: monitor-vagas
   cancel-in-progress: false
@@ -47,6 +47,9 @@ jobs:
           TELEFONE: ${{ secrets.TELEFONE }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # A lista de especialidades também é secret: ela diz quais exames
+          # estou procurando e não fica versionada.
+          ESPECIALIDADES: ${{ secrets.ESPECIALIDADES }}
         run: npm start
 
       - name: Guardar screenshot de erro (se houver)
@@ -56,10 +59,10 @@ jobs:
           name: erro-debug
           path: erro-debug.png
           if-no-files-found: ignore
-          # O screenshot mostra o formulário preenchido (nome, CPF, matrícula,
-          # telefone). Ele só é útil nas horas seguintes à falha, então não faz
-          # sentido mantê-lo os 90 dias padrão.
-          retention-days: 3
+          # Os campos preenchidos são mascarados antes da captura (src/screenshot.js),
+          # mas o arquivo só serve nas horas seguintes à falha. Sem motivo pra
+          # ficar os 90 dias padrão.
+          retention-days: 1
 
       - name: Salvar estado atualizado
         if: always()
@@ -69,7 +72,7 @@ jobs:
           git add state.json
           git diff --cached --quiet && exit 0
           git commit -m "Atualiza estado do monitoramento [skip ci]"
-          # O remoto pode ter andado desde o checkout (um commit seu, por
-          # exemplo). Rebase antes do push evita perder a execução por isso.
+          # O remoto pode ter andado desde o checkout, um commit meu por
+          # exemplo. Rebase antes do push evita perder a execução por isso.
           git pull --rebase origin main
           git push

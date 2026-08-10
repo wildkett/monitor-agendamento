@@ -1,5 +1,16 @@
 node_modules/
 .env
-# Screenshots de erro mostram o formulário preenchido (nome, CPF, matrícula,
-# telefone) — nunca devem ser commitados.
+
+# Quais especialidades e períodos monitorar. Isso conta que exames a pessoa
+# procura, então não vai pro repositório. No Actions vem do secret
+# ESPECIALIDADES; local, deste arquivo. O modelo é o especialidades.example.json.
+config/especialidades.json
+
+# Screenshots de erro. Os campos preenchidos são mascarados antes da captura,
+# mas a tela ainda mostra o convênio e a especialidade, então ficam de fora.
 erro-*.png
+
+# Configuração local de editor / ferramentas
+.claude/
+.idea/
+.vscode/
