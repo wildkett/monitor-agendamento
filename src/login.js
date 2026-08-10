@@ -7,12 +7,11 @@ export async function login(page, config) {
     "Matrícula"
   );
 
-  // Seleciona convênio (após preencher matrícula)
   await page.getByText(`Selecione o Convênio: ${config.convenio}`).click();
 
-  // Com a matrícula preenchida, o site consulta o banco do convênio e traz
-  // nome, data de nascimento e e-mail sozinho. Esperar esse retorno antes de
-  // seguir — se pularmos, o formulário vai para validação ainda incompleto.
+  // Com a matrícula preenchida o site consulta o convênio e traz nome,
+  // nascimento e e-mail sozinho. Se eu seguir antes disso chegar, o formulário
+  // vai pra validação incompleto.
   await esperarPreenchido(
     page.getByRole("textbox", { name: "Nome Completo:" }),
     "Nome Completo"
@@ -29,38 +28,33 @@ export async function login(page, config) {
     "Telefone Celular"
   );
 
-  // Clica em Avançar
   await page.getByRole("button", { name: "Avançar" }).click();
-
   await page.waitForLoadState("networkidle");
 
-  // O modal de encaminhamentos/retornos é deixado ABERTO de propósito: as
-  // especialidades listadas nele saem do dropdown, e só dá para agendá-las
-  // pelo botão "Agendar" de dentro do modal. Quem decide fechar é o chamador,
-  // depois de tratar essas especialidades.
+  // O modal de encaminhamentos/retornos fica ABERTO de propósito. As
+  // especialidades que aparecem nele saem do dropdown e só dá pra agendar pelo
+  // botão daqui. Quem fecha é o index.js, depois de tratar essas.
   await modal(page)
     .waitFor({ state: "visible", timeout: 10000 })
-    .catch(() => {}); // sem pendências, o modal nem aparece
+    .catch(() => {}); // sem pendências o modal nem abre
 
-  // Se algum campo obrigatório não passar na validação, o site simplesmente
-  // não sai da tela inicial — melhor falhar aqui com uma mensagem clara do que
-  // estourar timeout lá na frente procurando o dropdown de especialidade.
+  // Se algum campo obrigatório não passa na validação, o site simplesmente não
+  // sai da tela inicial. Falhar aqui com mensagem clara é melhor do que estourar
+  // timeout lá na frente procurando o dropdown.
   if (!(await modalAberto(page))) {
     const dropdown = page.locator('[id="frmInicial:group"]');
     await dropdown.waitFor({ state: "visible", timeout: 15000 }).catch(() => {
       throw new Error(
-        "O login não avançou da tela inicial — algum campo obrigatório não foi " +
+        "O login não avançou da tela inicial: algum campo obrigatório não foi " +
           "aceito. Rode com HEADLESS=false para ver o formulário."
       );
     });
   }
 }
 
-/**
- * O modal visível da tela. O ID é dinâmico (j_idt294, j_idt295...) e o
- * PrimeFaces deixa vários .ui-dialog escondidos no HTML desde o carregamento,
- * por isso o :visible é obrigatório — sem ele, pega um modal invisível.
- */
+// O ID do modal é dinâmico (j_idt294, j_idt295...) e o PrimeFaces deixa vários
+// .ui-dialog escondidos no HTML desde que a página carrega. Sem o :visible eu
+// pegava um modal invisível.
 export function modal(page) {
   return page.locator(".ui-dialog:visible").first();
 }
@@ -71,14 +65,9 @@ export async function modalAberto(page) {
     .catch(() => false);
 }
 
-/**
- * Lê as especialidades listadas no modal — tanto as "Solicitações de
- * Encaminhamento" quanto o "Acompanhamento Médico (Retornos)". Cada linha
- * dessas tabelas tem o nome da especialidade e um botão "Agendar".
- *
- * Isso importa porque essas especialidades são removidas do dropdown: para
- * elas, o botão do modal é o único caminho.
- */
+// Lê as especialidades do modal, tanto as "Solicitações de Encaminhamento"
+// quanto o "Acompanhamento Médico (Retornos)". Preciso dessa lista porque essas
+// especialidades somem do dropdown e o botão daqui vira o único caminho.
 export async function listarEncaminhamentos(page) {
   if (!(await modalAberto(page))) return [];
 
@@ -89,9 +78,6 @@ export async function listarEncaminhamentos(page) {
 
   const nomes = [];
   for (const linha of linhas) {
-    // Ler a primeira célula, e não a primeira linha do texto: na tabela de
-    // retornos as colunas (especialidade, médico, dias) vêm todas na mesma
-    // linha, separadas por espaços — "OTORRINOLARINGOLOGIA NOME DO MEDICO 15".
     const especialidade = await primeiraCelula(linha);
     if (especialidade && especialidade !== "Agendar") nomes.push(especialidade);
   }
@@ -99,14 +85,14 @@ export async function listarEncaminhamentos(page) {
   return nomes;
 }
 
+// Primeira célula e não primeira linha do texto: na tabela de retornos as
+// colunas vêm todas grudadas, tipo "OTORRINOLARINGOLOGIA NOME DO MEDICO 15".
 async function primeiraCelula(linha) {
   return (await linha.locator("td").first().innerText().catch(() => "")).trim();
 }
 
-/**
- * Clica no "Agendar" da linha correspondente. O site fecha o modal e já deixa
- * a especialidade escolhida no dropdown — resta só clicar em "Avançar".
- */
+// Clica no "Agendar" da linha certa. O site fecha o modal e já deixa a
+// especialidade escolhida no dropdown, aí só falta o "Avançar".
 export async function agendarPeloModal(page, nome) {
   const linhas = await modal(page)
     .locator("tr")
@@ -138,22 +124,19 @@ function somenteDigitos(valor) {
   return valor.replace(/\D/g, "");
 }
 
-/**
- * Matrícula, CPF e Telefone têm máscara de entrada, que é sensível de duas
- * formas:
- *
- *   - fill() joga o texto de uma vez e a máscara descarta, deixando o campo
- *     vazio (foi o que aconteceu com a matrícula na execução do GitHub);
- *   - se a digitação começar antes do JavaScript da máscara terminar de
- *     inicializar, ela reposiciona o cursor no meio do caminho e os dígitos
- *     saem fora de ordem. Na nuvem isso fazia o primeiro dígito do CPF ser
- *     empurrado até o fim, invalidando o número inteiro.
- *
- * Não adianta forçar a posição do cursor: o campo já contém o gabarito inteiro
- * ("__.___.__._____.__-_") e a máscara gerencia o cursor sozinha. O que
- * funciona é digitar, conferir o resultado e repetir se saiu errado — o que
- * cobre a corrida de inicialização sem depender da velocidade da máquina.
- */
+// Matrícula, CPF e Telefone têm máscara de entrada, e ela deu trabalho de dois
+// jeitos diferentes:
+//
+//   - o fill() joga o texto de uma vez e a máscara descarta, o campo fica vazio
+//     (foi o que aconteceu com a matrícula na execução do GitHub);
+//   - se a digitação começa antes do JS da máscara terminar de carregar, ela
+//     reposiciona o cursor no meio e os dígitos saem fora de ordem. Na nuvem
+//     isso jogava o primeiro dígito do CPF pro fim e invalidava o número.
+//
+// Forçar a posição do cursor não resolve, porque o campo já vem com o gabarito
+// inteiro ("__.___.___-__") e a máscara controla o cursor sozinha. O que
+// funcionou foi digitar, conferir e repetir se não bateu, o que também cobre a
+// demora de carregamento sem depender da velocidade da máquina.
 async function preencherComMascara(campo, valor, rotulo) {
   const digitos = somenteDigitos(valor);
   const TENTATIVAS = 3;
@@ -166,18 +149,16 @@ async function preencherComMascara(campo, valor, rotulo) {
 
     await campo.pressSequentially(digitos, { delay: 60 });
 
-    // A máscara insere pontuação, então a conferência é só nos dígitos.
+    // A máscara insere pontuação, então comparo só os dígitos.
     ultimoResultado = somenteDigitos(await campo.inputValue());
     if (ultimoResultado === digitos) return;
 
-    // Dá um tempo para a máscara terminar de inicializar antes de repetir.
     await campo.page().waitForTimeout(1000 * tentativa);
   }
 
-  // A mensagem descreve o sintoma sem incluir os valores: ela vai para o log
-  // do GitHub Actions, e o mascaramento automático de secrets só cobre o que
-  // casa exatamente com o valor cadastrado — o texto embaralhado pela máscara
-  // não casaria com nada e apareceria em claro.
+  // A mensagem descreve o sintoma sem mostrar o valor. Ela vai pro log do
+  // Actions, e o mascaramento automático de secrets só cobre o texto idêntico
+  // ao cadastrado: o valor embaralhado pela máscara não casaria e apareceria.
   const diagnostico =
     ultimoResultado.length === 0
       ? "o campo ficou vazio"
@@ -191,11 +172,9 @@ async function preencherComMascara(campo, valor, rotulo) {
   );
 }
 
-/**
- * Os campos que o site preenche sozinho a partir da matrícula chegam por AJAX.
- * Em máquina local isso é quase instantâneo, mas no runner do GitHub demora o
- * suficiente para o resto do fluxo passar na frente.
- */
+// Os campos que o site preenche sozinho a partir da matrícula chegam por AJAX.
+// Local é quase instantâneo, mas no runner do GitHub demora o bastante pro
+// resto do fluxo passar na frente.
 async function esperarPreenchido(campo, rotulo) {
   const limite = Date.now() + 30000;
 
@@ -210,11 +189,8 @@ async function esperarPreenchido(campo, rotulo) {
   );
 }
 
-/**
- * Fecha o modal. Necessário antes de usar o dropdown, porque a máscara do
- * PrimeFaces (.ui-widget-overlay) intercepta todos os cliques enquanto ele
- * estiver aberto.
- */
+// Precisa fechar o modal antes de usar o dropdown: enquanto ele está aberto a
+// máscara do PrimeFaces (.ui-widget-overlay) intercepta todos os cliques.
 export async function fecharModal(page) {
   if (!(await modalAberto(page))) return;
 
@@ -226,7 +202,7 @@ export async function fecharModal(page) {
     .waitFor({ state: "hidden", timeout: 10000 })
     .catch(() => {
       throw new Error(
-        "O modal de agendamentos não fechou — a máscara continua bloqueando a tela."
+        "O modal de agendamentos não fechou, a máscara continua bloqueando a tela."
       );
     });
 }

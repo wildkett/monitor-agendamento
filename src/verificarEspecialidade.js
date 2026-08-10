@@ -1,12 +1,11 @@
-// "Segunda-feira , 10 de Agosto de 2026" — o mês vem por extenso e pode ter
-// acento (Março), por isso [a-zA-ZçÇãÃ]+ no lugar de \w+.
+// "Segunda-feira , 10 de Agosto de 2026". O mês vem por extenso e pode ter
+// acento (Março), por isso [a-zA-ZçÇãÃ]+ em vez de \w+.
 const REGEX_DATA = /(\d{1,2}) de ([a-zA-ZçÇãÃ]+) de (\d{4})/;
 
 /**
  * @param {object} opcoes
- * @param {boolean} opcoes.viaModal quando a especialidade veio de um
- *   encaminhamento/retorno, ela já foi escolhida pelo botão "Agendar" do modal
- *   e não aparece no dropdown — resta só avançar.
+ * @param {boolean} opcoes.viaModal a especialidade já foi escolhida pelo botão
+ *   "Agendar" do modal, então não passa pelo dropdown. Só falta avançar.
  */
 export async function verificarEspecialidade(page, especialidadeConfig, opcoes = {}) {
   const { nome, dataInicio, dataFim } = especialidadeConfig;
@@ -15,21 +14,20 @@ export async function verificarEspecialidade(page, especialidadeConfig, opcoes =
   await page.waitForLoadState('networkidle');
 
   if (!viaModal) {
-    // Correspondência exata primeiro: por padrão o Playwright casa por trecho,
-    // e "CARDIOLOGIA" bateria também em "CARDIOLOGIA PEDIATRICA". Além de
-    // arriscar clicar na opção errada, o casamento múltiplo faz o Playwright
-    // recusar a ação por strict mode — que é como uma especialidade presente
-    // na lista acabava reportada como ausente.
+    // Tento a correspondência exata primeiro. O Playwright casa por trecho por
+    // padrão, então "CARDIOLOGIA" bateria também em "CARDIOLOGIA PEDIATRICA".
+    // Além de poder clicar na opção errada, casar com duas faz o strict mode
+    // recusar a ação, e era assim que uma especialidade que existia na lista
+    // acabava reportada como ausente.
     const exata = page.getByRole('option', { name: nome, exact: true });
     const parcial = page.getByRole('option', { name: nome });
 
-    // Abrir a lista completa pelo botão resolve a maioria dos casos.
     await page.locator('[id="frmInicial:group"]').getByRole('button').click();
     let opcao = (await visivelEm(exata, 4000)) ? exata : null;
 
     if (!opcao) {
-      // O campo é um autocomplete: com a lista longa, nem todo item fica
-      // acessível só abrindo o dropdown. Digitar filtra e traz o item à tona.
+      // O campo é um autocomplete. Com a lista grande, nem todo item fica
+      // acessível só abrindo o dropdown; digitar filtra e traz o item.
       const entrada = page.locator('[id="frmInicial:group_input"]');
       await entrada.click();
       await entrada.fill('');
@@ -40,8 +38,8 @@ export async function verificarEspecialidade(page, especialidadeConfig, opcoes =
     }
 
     if (!opcao) {
-      // Ausência é resposta esperada, não falha: a especialidade pode estar só
-      // no modal (e quem chama tenta por lá) ou não ser oferecida.
+      // Não achar é resposta esperada, não erro: a especialidade pode estar só
+      // no modal (o index.js tenta por lá) ou não ser oferecida.
       const erro = new Error(`"${nome}" não está na lista do dropdown.`);
       erro.code = 'NAO_NO_DROPDOWN';
       throw erro;
@@ -53,9 +51,9 @@ export async function verificarEspecialidade(page, especialidadeConfig, opcoes =
   await page.getByRole('button', { name: 'Avançar' }).click();
   await page.waitForLoadState('networkidle');
 
-  // A grade de datas chega por AJAX e o networkidle às vezes dispara antes
-  // dela renderizar. Esperar o container evita ler a página vazia e concluir,
-  // errado, que não há vaga nenhuma.
+  // A grade de datas chega por AJAX e o networkidle às vezes dispara antes dela
+  // renderizar. Esperar o container evita ler a página vazia e concluir errado
+  // que não tem vaga nenhuma.
   const grade = page.locator('[id="frmInicial:pnlUniDatas_content"]').first();
   const temGrade = await grade
     .waitFor({ state: 'visible', timeout: 15000 })
@@ -63,8 +61,8 @@ export async function verificarEspecialidade(page, especialidadeConfig, opcoes =
     .catch(() => false);
 
   if (!temGrade) {
-    // Sem a grade, há dois casos bem diferentes: ou o site não tem agenda para
-    // essa especialidade, ou o "Avançar" não saiu do lugar. Distinguir evita
+    // Sem a grade são dois casos bem diferentes: ou não tem agenda pra essa
+    // especialidade, ou o "Avançar" não saiu do lugar. Separar os dois evita
     // registrar "nenhuma vaga" quando na verdade o fluxo travou.
     const aindaNaSelecao = await page
       .locator('[id="frmInicial:group"]')
@@ -73,7 +71,7 @@ export async function verificarEspecialidade(page, especialidadeConfig, opcoes =
 
     if (aindaNaSelecao) {
       throw new Error(
-        `O "Avançar" não levou à agenda de "${nome}" — a tela continua na ` +
+        `O "Avançar" não levou à agenda de "${nome}": a tela continua na ` +
           `seleção de especialidade.`
       );
     }
@@ -85,10 +83,10 @@ export async function verificarEspecialidade(page, especialidadeConfig, opcoes =
   const vagasNoPeriodo = [];
   const jaVistas = new Set();
 
-  // Cada linha da tabela traz a data e, abaixo, as unidades disponíveis:
-  //   "Segunda-feira , 10 de Agosto de 2026\n\nUNIDADE CENTRO\nRUA EXEMPLO, 100"
-  // Ler o innerText inteiro é mais estável do que caçar span por span, porque
-  // a página tem dezenas de <tr> aninhados e sem estrutura uniforme.
+  // Cada linha traz a data e, abaixo, as unidades:
+  //   "Segunda-feira , 10 de Agosto de 2026\n\nUNIDADE CENTRO\nRUA X, 220"
+  // Ler o innerText inteiro saiu mais estável do que caçar span por span,
+  // porque a página tem dezenas de <tr> aninhados e sem estrutura uniforme.
   const linhas = await page.locator('tr').all();
 
   for (const linha of linhas) {
@@ -96,7 +94,7 @@ export async function verificarEspecialidade(page, especialidadeConfig, opcoes =
     try {
       texto = await linha.innerText();
     } catch {
-      continue; // linha sumiu do DOM entre o .all() e a leitura
+      continue; // a linha sumiu do DOM entre o .all() e a leitura
     }
 
     if (!texto) continue;
@@ -106,7 +104,6 @@ export async function verificarEspecialidade(page, especialidadeConfig, opcoes =
       .map((l) => l.trim())
       .filter(Boolean);
 
-    // "Segunda-feira , 10 de Agosto de 2026" → "2026-08-10"
     const matchData = partes[0]?.match(REGEX_DATA);
     if (!matchData) continue;
 
@@ -115,9 +112,9 @@ export async function verificarEspecialidade(page, especialidadeConfig, opcoes =
 
     if (data < dataInicio || data > dataFim) continue;
 
-    // Depois da data vêm pares de linhas: nome da unidade + endereço.
-    // Uma linha "pai" pode englobar várias datas, então corta no ponto em que
-    // aparece a próxima data — senão ela seria lida como nome de unidade.
+    // Depois da data vêm pares de linhas: nome da unidade e endereço. Uma linha
+    // "pai" pode englobar várias datas, então corto onde aparece a próxima data,
+    // senão ela seria lida como nome de unidade.
     let resto = partes.slice(1);
     const proximaData = resto.findIndex((l) => REGEX_DATA.test(l));
     if (proximaData !== -1) resto = resto.slice(0, proximaData);
@@ -142,29 +139,27 @@ export async function verificarEspecialidade(page, especialidadeConfig, opcoes =
     console.log(`  [debug] ${linhas.length} linha(s) na tabela, ${vagasNoPeriodo.length} no período`);
   }
 
-  // Sem "Voltar para a tela inicial" aqui: esse link devolve para o formulário
-  // de matrícula e encerra a sessão, então quem chama refaz o login para a
-  // próxima especialidade.
-  return vagasNoPeriodo; 
+  // Não uso o "Voltar para a tela inicial" aqui: ele devolve pro formulário de
+  // matrícula e encerra a sessão. Quem chama refaz o login pra próxima.
+  return vagasNoPeriodo;
 }
 
 /**
- * Entra na unidade de uma vaga e lê os horários livres.
+ * Entra na unidade da vaga e lê os horários livres.
  *
- * Os horários não existem na grade de datas: o link da unidade só carrega
- * `wr('44,1625,2026-08-10')`, sem hora. Eles só aparecem na tela seguinte, em
- * botões como `whrora('36,127546,2026-08-29,07:30')`. Por isso essa busca é
- * feita apenas para as vagas novas — varrer as 30 já conhecidas a cada ciclo
- * seria carga desnecessária no site.
+ * O horário não existe na grade de datas: o link da unidade carrega só
+ * `wr('44,1625,2026-08-10')`, sem hora. Ele aparece na tela seguinte, em botões
+ * tipo `whrora('36,127546,2026-08-29,07:30')`. Por isso só busco pras vagas
+ * novas, varrer as 30 conhecidas a cada ciclo seria carga à toa.
  *
  * Precisa ser chamada com a página ainda na grade de datas.
  *
  * @returns {Promise<string[]>} horários no formato "07:30", ou [] se não deu
- *   para abrir a unidade (o alerta segue sem horário, em vez de falhar).
+ *   pra abrir a unidade (o alerta vai sem horário em vez de falhar).
  */
 export async function buscarHorarios(page, vaga) {
-  // vaga.profissional é "HOSPITAL EXEMPLO — RUA EXEMPLO...",
-  // mas o link traz só o nome da unidade, antes do travessão.
+  // vaga.profissional é "UNIDADE CENTRO — RUA X, 220", mas o link traz só o
+  // nome da unidade, antes do travessão.
   const unidade = vaga.profissional.split(' — ')[0].trim();
 
   const linhaDaData = page
@@ -177,8 +172,8 @@ export async function buscarHorarios(page, vaga) {
     .first();
 
   if ((await link.count()) === 0) {
-    // Mensagem detalhada de propósito: é a única pista de por que a busca de
-    // horário não aconteceu, e distingue "a grade sumiu" de "o link mudou".
+    // Mensagem detalhada de propósito: é a única pista de por que a busca não
+    // aconteceu, e separa "a grade sumiu" de "o link mudou".
     throw new Error(
       `link da unidade "${unidade}" não encontrado na linha de ${vaga.data} ` +
         `(grade visível: ${await naGradeDeDatas(page)}, url: ${page.url()})`
@@ -188,19 +183,19 @@ export async function buscarHorarios(page, vaga) {
   await link.click();
   await page.waitForLoadState('networkidle');
 
-  // Os horários são botões cujo rótulo é só "HH:MM". Mirar direto neles (em
-  // vez de varrer todos os botões da página) permite esperar a renderização:
-  // o networkidle às vezes dispara antes de a grade de horários existir.
+  // Os horários são botões cujo rótulo é só "HH:MM". Mirar direto neles em vez
+  // de varrer todos os botões me deixa esperar a renderização, porque o
+  // networkidle às vezes dispara antes da grade de horários existir.
   const botoesHorario = page.getByRole('button', { name: /^\d{1,2}:\d{2}$/ });
   await botoesHorario
     .first()
     .waitFor({ state: 'visible', timeout: 10000 })
-    .catch(() => {}); // pode realmente não haver horário livre
+    .catch(() => {}); // pode não ter horário livre mesmo
 
   const horarios = (await botoesHorario.allInnerTexts()).map((t) => t.trim());
 
-  // Tentar voltar DEPOIS de já ter os horários em mãos, e sem propagar o erro:
-  // se o retorno falhar, o que foi lido continua valendo. Quem chama detecta a
+  // Só tento voltar depois de já ter os horários na mão, e sem propagar o erro:
+  // se o retorno falhar, o que foi lido continua valendo. O index.js percebe a
   // falha pelo naGradeDeDatas e para de buscar as próximas.
   await voltarParaGrade(page).catch((erro) => {
     console.log(`  (falha ao voltar: ${erro.message})`);
@@ -209,21 +204,20 @@ export async function buscarHorarios(page, vaga) {
   return [...new Set(horarios)].sort();
 }
 
-/** Da tela de horários de volta para a grade de datas. */
+/** Da tela de horários de volta pra grade de datas. */
 async function voltarParaGrade(page) {
-  // O rótulo é "Voltar para a tela ANTERIOR" — perigosamente parecido com
-  // "Voltar para a tela INICIAL", que reinicia a sessão e derruba o login.
-  // Por isso o nome vai completo, e não um "Voltar" solto que casaria com os
-  // dois. O elemento é um <a class="ui-commandlink"> com um ícone de seta.
+  // O rótulo é "Voltar para a tela ANTERIOR", perigosamente parecido com
+  // "Voltar para a tela INICIAL", que reinicia a sessão e derruba o login. Por
+  // isso o nome vai completo: um "Voltar" solto casaria com os dois.
   const voltar = page.getByRole('link', { name: 'Voltar para a tela anterior' });
   const quantos = await voltar.count().catch(() => 0);
 
   if (quantos > 0) {
     await voltar.first().click({ timeout: 10000 }).catch(() => {});
 
-    // O link é um ui-commandlink: dispara AJAX (com o dlgProgresso) e troca o
-    // painel sem recarregar a página. O networkidle termina antes disso, então
-    // é preciso esperar a grade reaparecer em vez de conferir na hora.
+    // É um ui-commandlink: dispara AJAX e troca o painel sem recarregar a
+    // página. O networkidle termina antes disso, então espero a grade
+    // reaparecer em vez de conferir na hora.
     const voltou = await page
       .getByRole('link', { name: /Botão de Seleção de Unidade/ })
       .first()
@@ -240,7 +234,7 @@ async function voltarParaGrade(page) {
   );
 }
 
-/** A grade mostra a data por extenso: "2026-08-29" → "29 de Agosto de 2026". */
+/** A grade mostra a data por extenso: "2026-08-29" vira "29 de Agosto de 2026". */
 function formatarDataExtenso(data) {
   const [ano, mes, dia] = data.split('-');
   const nomes = {
@@ -263,11 +257,11 @@ function escaparRegex(texto) {
   return texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** A grade continua acessível? Serve para saber se o "Voltar" funcionou. */
+/** A grade continua acessível? Uso pra saber se o "Voltar" funcionou. */
 export async function naGradeDeDatas(page) {
-  // Identificar a grade pelos links de unidade, e não pelo id do container: os
+  // Identifico a grade pelos links de unidade e não pelo id do container: os
   // ids são gerados pelo JSF e mudam conforme o fluxo (pnlUniDatas_content num
-  // caso, j_idt100:0:dtgrd_content noutro). Os links, esses, estão sempre lá.
+  // caso, j_idt100:0:dtgrd_content noutro). Os links estão sempre lá.
   const links = page.getByRole('link', { name: /Botão de Seleção de Unidade/ });
   return (await links.count().catch(() => 0)) > 0;
 }
