@@ -7,6 +7,13 @@ const PASTA_CONFIG = join(__dirname, "..", "config");
 const ARQUIVO_LOCAL = join(PASTA_CONFIG, "especialidades.json");
 const ARQUIVO_EXEMPLO = join(PASTA_CONFIG, "especialidades.example.json");
 
+// O workflow_dispatch manda a string "false" quando a caixinha vem desmarcada, e
+// string não vazia é verdadeira em JS. Por isso não dá pra testar só a presença.
+function ligado(valor) {
+  const v = (valor ?? "").trim().toLowerCase();
+  return v !== "" && v !== "false" && v !== "0" && v !== "nao" && v !== "não";
+}
+
 function obrigatorio(nome) {
   const valor = process.env[nome];
   if (!valor) {
@@ -83,5 +90,8 @@ export function carregarConfig() {
     telegramBotToken: obrigatorio("TELEGRAM_BOT_TOKEN"),
     telegramChatId: obrigatorio("TELEGRAM_CHAT_ID"),
     especialidades: carregarEspecialidades(),
+    // Registra as vagas sem mandar mensagem. Serve pra primeira execução, com o
+    // state.json vazio, quando tudo que está aberto contaria como novidade.
+    semAlerta: ligado(process.env.SEM_ALERTA),
   };
 }

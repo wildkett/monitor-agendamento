@@ -5,7 +5,13 @@ on:
     # A cada 20 minutos. O GitHub não garante o horário exato quando está
     # concorrido, mas na prática costuma rodar perto disso.
     - cron: "*/20 * * * *"
-  workflow_dispatch: {} # permite rodar manualmente pela aba Actions
+  # Permite rodar manualmente pela aba Actions
+  workflow_dispatch:
+    inputs:
+      sem_alerta:
+        description: "Só registra as vagas, sem avisar no Telegram (use na primeira execução)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write # o job commita o state.json atualizado
@@ -50,6 +56,8 @@ jobs:
           # A lista de especialidades também é secret: ela diz quais exames
           # estou procurando e não fica versionada.
           ESPECIALIDADES: ${{ secrets.ESPECIALIDADES }}
+          # Vazio quando o gatilho é o cron, porque inputs só existe no dispatch.
+          SEM_ALERTA: ${{ inputs.sem_alerta }}
         run: npm start
 
       - name: Guardar screenshot de erro (se houver)

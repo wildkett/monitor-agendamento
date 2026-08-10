@@ -81,6 +81,14 @@ O workflow já roda a cada 20 minutos. Dá pra disparar na mão em
 **Actions → Monitor de vagas → Run workflow**, o que ajuda a testar sem esperar
 o cron.
 
+### Primeira execução
+
+Com o `state.json` vazio, tudo que estiver aberto hoje conta como novidade e
+chegaria de uma vez no Telegram. Pra evitar isso, a primeira execução pode ser
+feita em modo silencioso: marque **sem_alerta** no **Run workflow**, ou rode
+local com `SEM_ALERTA=1`. As vagas ficam registradas e a partir daí só chega o
+que aparecer de novo.
+
 ### Criar o bot do Telegram
 
 1. No Telegram, abra conversa com **@BotFather**.

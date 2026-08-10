@@ -104,16 +104,22 @@ async function main() {
         if (vagasNovas.length > 0) {
           console.log(`  -> ${comHorario} de ${vagasNovas.length} vaga(s) com horário`);
 
-          const mensagem = formatarMensagemVaga({
-            especialidade: nome,
-            vagas: vagasNovas,
-            urlAgenda: config.agendaUrl,
-          });
-          await enviarAlertaTelegram({
-            botToken: config.telegramBotToken,
-            chatId: config.telegramChatId,
-            mensagem,
-          });
+          if (config.semAlerta) {
+            // Com o state.json vazio, tudo que está aberto hoje conta como novo
+            // e viraria uma enxurrada de mensagem. Aqui só registra.
+            console.log(`  (SEM_ALERTA: ${vagasNovas.length} vaga(s) registrada(s) sem avisar)`);
+          } else {
+            const mensagem = formatarMensagemVaga({
+              especialidade: nome,
+              vagas: vagasNovas,
+              urlAgenda: config.agendaUrl,
+            });
+            await enviarAlertaTelegram({
+              botToken: config.telegramBotToken,
+              chatId: config.telegramChatId,
+              mensagem,
+            });
+          }
         }
 
         atualizarEstado(estado, nome, vagas);
