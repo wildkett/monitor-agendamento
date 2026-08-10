@@ -46,7 +46,11 @@ function validarLista(lista, origem) {
 // ela não fica versionada. No GitHub Actions vem do secret ESPECIALIDADES; na
 // máquina, de config/especialidades.json, que está no .gitignore. O arquivo de
 // exemplo só existe para o projeto rodar em quem acabou de clonar.
-export function carregarEspecialidades() {
+// Os caminhos entram por parâmetro pro teste poder apontar pra fixtures em vez
+// dos arquivos reais, que mudam de máquina pra máquina.
+export function carregarEspecialidades(opcoes = {}) {
+  const arquivoLocal = opcoes.arquivoLocal ?? ARQUIVO_LOCAL;
+  const arquivoExemplo = opcoes.arquivoExemplo ?? ARQUIVO_EXEMPLO;
   const doAmbiente = (process.env.ESPECIALIDADES ?? "").trim();
 
   if (doAmbiente) {
@@ -59,9 +63,9 @@ export function carregarEspecialidades() {
     return validarLista(lista, "o secret ESPECIALIDADES");
   }
 
-  if (existsSync(ARQUIVO_LOCAL)) {
+  if (existsSync(arquivoLocal)) {
     return validarLista(
-      JSON.parse(readFileSync(ARQUIVO_LOCAL, "utf-8")),
+      JSON.parse(readFileSync(arquivoLocal, "utf-8")),
       "config/especialidades.json"
     );
   }
@@ -71,7 +75,7 @@ export function carregarEspecialidades() {
       "exemplo. Copie especialidades.example.json para especialidades.json e edite."
   );
   return validarLista(
-    JSON.parse(readFileSync(ARQUIVO_EXEMPLO, "utf-8")),
+    JSON.parse(readFileSync(arquivoExemplo, "utf-8")),
     "config/especialidades.example.json"
   );
 }

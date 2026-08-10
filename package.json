@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
+    "test": "node --test",
     "inspecionar": "playwright codegen $AGENDA_URL"
   },
   "dependencies": {

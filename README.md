@@ -126,6 +126,20 @@ O horário fica de fora da chave de propósito. Ele só é buscado depois, e só
 vagas novas, porque custa uma navegação a mais por vaga. Se entrasse na chave,
 toda vaga conhecida mudaria de identidade ao ganhar horário e seria avisada de novo.
 
+## Testes
+
+```bash
+npm test
+```
+
+Usa o `node:test`, que já vem no Node, sem dependência a mais. Cobrem as funções
+puras: a chave de estado e o filtro de vagas novas (`src/state.js`) e a leitura
+de configuração (`src/config.js`). O fluxo no site não entra aqui, porque
+dependeria do site no ar e de dado real de acesso.
+
+Rodam sozinhos no GitHub Actions a cada push e a cada pull request
+(`.github/workflows/testes.yml`).
+
 ## Quando algo quebra
 
 O site pode mudar os seletores. Duas ferramentas ajudam:
