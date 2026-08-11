@@ -1,13 +1,37 @@
 # Monitor de Vagas - Agendamento Médico
 
+[![Testes](https://github.com/wildkett/monitor-agendamento/actions/workflows/testes.yml/badge.svg)](https://github.com/wildkett/monitor-agendamento/actions/workflows/testes.yml)
+[![Monitor](https://github.com/wildkett/monitor-agendamento/actions/workflows/monitor.yml/badge.svg)](https://github.com/wildkett/monitor-agendamento/actions/workflows/monitor.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Verifica de tempos em tempos um site de agendamento e manda mensagem no Telegram
 quando abre uma vaga na especialidade e no período que você configurar. Roda
 sozinho na nuvem pelo GitHub Actions, sem precisar deixar o computador ligado.
 
-O site que motivou o projeto é feito em JSF/PrimeFaces, o que trouxe alguns
-problemas específicos (campos com máscara, IDs dinâmicos, AJAX que termina depois
-do `networkidle`). As soluções estão comentadas no código e resumidas na seção
+Nasceu de um problema real: as vagas do convênio abrem sem aviso e somem em
+poucas horas, então quem não fica atualizando a página o dia inteiro não consegue
+marcar. Está em produção desde julho de 2026, rodando a cada 20 minutos.
+
+O site é feito em JSF/PrimeFaces, o que trouxe problemas específicos (campos com
+máscara, IDs dinâmicos, AJAX que termina depois do `networkidle`). As soluções
+estão comentadas no código e resumidas em
 [Detalhes do site](#detalhes-do-site-que-custaram-tempo).
+
+## O alerta que chega
+
+```
+🩺 OLHA A VAAAGAAA: CARDIOLOGIA
+
+• 12/08 às 07:30, 08:00
+  HOSPITAL EXEMPLO — RUA EXEMPLO, 100
+• 15/08/2026
+  UNIDADE CENTRO — RUA EXEMPLO, 100
+
+CLICA AÍ E AGENDA LOGO: https://site-do-convenio.com.br/Agenda
+```
+
+Só as vagas novas entram na mensagem. As que já foram avisadas ficam registradas
+e não voltam a cada 20 minutos.
 
 ## Stack
 

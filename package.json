@@ -2,7 +2,24 @@
   "name": "monitor-agendamento-medico",
   "version": "1.0.0",
   "description": "Monitora um site de agendamento médico e alerta no Telegram quando abre vaga na especialidade e período desejados.",
+  "keywords": [
+    "playwright",
+    "automacao",
+    "web-scraping",
+    "telegram-bot",
+    "github-actions",
+    "nodejs"
+  ],
+  "author": "Kettly Lima (https://github.com/wildkett)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wildkett/monitor-agendamento.git"
+  },
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node src/index.js",
     "test": "node --test",
