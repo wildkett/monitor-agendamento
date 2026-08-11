@@ -108,7 +108,9 @@ export async function agendarPeloModal(page, nome) {
   }
 
   if (!alvo) {
-    throw new Error(`"${nome}" não foi encontrada entre as linhas do modal.`);
+    // Sem o nome na mensagem: ela vai pro log do Actions, que é público. Quem
+    // chama já identifica de qual especialidade se trata.
+    throw new Error("a especialidade não foi encontrada entre as linhas do modal.");
   }
 
   await alvo.getByRole("button", { name: "Agendar" }).click();
