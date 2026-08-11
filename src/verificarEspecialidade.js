@@ -2,6 +2,11 @@
 // acento (Março), por isso [a-zA-ZçÇãÃ]+ em vez de \w+.
 const REGEX_DATA = /(\d{1,2}) de ([a-zA-ZçÇãÃ]+) de (\d{4})/;
 
+// Nome de especialidade e de unidade ficam fora das mensagens: elas vão pro log
+// do Actions, que é público. Quem chama já identifica qual especialidade era.
+// Localmente, com DEBUG_VAGAS, o nome volta pra facilitar a investigação.
+const DETALHADO = Boolean(process.env.DEBUG_VAGAS);
+
 /**
  * @param {object} opcoes
  * @param {boolean} opcoes.viaModal a especialidade já foi escolhida pelo botão
@@ -40,7 +45,9 @@ export async function verificarEspecialidade(page, especialidadeConfig, opcoes =
     if (!opcao) {
       // Não achar é resposta esperada, não erro: a especialidade pode estar só
       // no modal (o index.js tenta por lá) ou não ser oferecida.
-      const erro = new Error(`"${nome}" não está na lista do dropdown.`);
+      const erro = new Error(
+        DETALHADO ? `"${nome}" não está na lista do dropdown.` : "não está na lista do dropdown."
+      );
       erro.code = 'NAO_NO_DROPDOWN';
       throw erro;
     }
@@ -71,12 +78,12 @@ export async function verificarEspecialidade(page, especialidadeConfig, opcoes =
 
     if (aindaNaSelecao) {
       throw new Error(
-        `O "Avançar" não levou à agenda de "${nome}": a tela continua na ` +
-          `seleção de especialidade.`
+        `o "Avançar" não levou à agenda${DETALHADO ? ` de "${nome}"` : ""}: a tela ` +
+          `continua na seleção de especialidade.`
       );
     }
 
-    console.log(`  -> Nenhuma agenda disponível para ${nome}`);
+    console.log(`  -> Nenhuma agenda disponível${DETALHADO ? ` para ${nome}` : ""}`);
     return [];
   }
 
@@ -175,8 +182,8 @@ export async function buscarHorarios(page, vaga) {
     // Mensagem detalhada de propósito: é a única pista de por que a busca não
     // aconteceu, e separa "a grade sumiu" de "o link mudou".
     throw new Error(
-      `link da unidade "${unidade}" não encontrado na linha de ${vaga.data} ` +
-        `(grade visível: ${await naGradeDeDatas(page)}, url: ${page.url()})`
+      `link da unidade${DETALHADO ? ` "${unidade}"` : ""} não encontrado na linha ` +
+        `de ${vaga.data} (grade visível: ${await naGradeDeDatas(page)})`
     );
   }
 
@@ -229,8 +236,8 @@ async function voltarParaGrade(page) {
   }
 
   throw new Error(
-    `não voltou para a grade (links "Voltar para a tela anterior": ${quantos}, ` +
-      `url: ${page.url()})`
+    `não voltou para a grade (links "Voltar para a tela anterior": ${quantos}` +
+      `${DETALHADO ? `, url: ${page.url()}` : ""})`
   );
 }
 

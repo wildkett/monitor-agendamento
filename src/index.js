@@ -27,11 +27,20 @@ async function main() {
   });
   const page = await browser.newPage();
 
+  // O nome da especialidade não entra no log: ele conta que exame a pessoa está
+  // procurando, e o log do Actions é público em repositório público. O
+  // mascaramento automático de secrets não cobre isso, porque ele esconde o
+  // valor inteiro de ESPECIALIDADES, e cada nome é só um pedaço dele. Com
+  // DEBUG_VAGAS, que é uso local, o nome volta a aparecer.
+  const detalhado = Boolean(process.env.DEBUG_VAGAS);
+  const total = config.especialidades.length;
+
   try {
     let primeiraVolta = true;
 
-    for (const especialidadeConfig of config.especialidades) {
+    for (const [indice, especialidadeConfig] of config.especialidades.entries()) {
       const { nome } = especialidadeConfig;
+      const rotulo = detalhado ? `"${nome}"` : `especialidade ${indice + 1} de ${total}`;
 
       try {
         // Cada especialidade recomeça do login. Na tela da agenda só existe
@@ -43,16 +52,18 @@ async function main() {
         // não aparece no dropdown, só aqui dentro.
         const encaminhamentos = await listarEncaminhamentos(page);
         if (primeiraVolta) {
-          console.log(
-            encaminhamentos.length > 0
-              ? `Encaminhamentos/retornos no modal: ${encaminhamentos.join(", ")}`
-              : "Nenhum encaminhamento pendente no modal."
-          );
+          if (encaminhamentos.length === 0) {
+            console.log("Nenhum encaminhamento pendente no modal.");
+          } else if (detalhado) {
+            console.log(`Encaminhamentos/retornos no modal: ${encaminhamentos.join(", ")}`);
+          } else {
+            console.log(`${encaminhamentos.length} encaminhamento(s)/retorno(s) no modal.`);
+          }
           primeiraVolta = false;
         }
 
         console.log(
-          `Verificando: ${nome} (${especialidadeConfig.dataInicio} a ${especialidadeConfig.dataFim})`
+          `Verificando ${rotulo} (${especialidadeConfig.dataInicio} a ${especialidadeConfig.dataFim})`
         );
 
         // Aparecer no modal não quer dizer que sumiu do dropdown: CARDIOLOGIA
@@ -124,9 +135,10 @@ async function main() {
 
         atualizarEstado(estado, nome, vagas);
       } catch (erroEspecialidade) {
-        console.error(`Erro ao verificar "${nome}":`, erroEspecialidade.message);
-        console.error(`  URL no momento do erro: ${page.url()}`);
-        await capturarTelaSemDados(page, `erro-${nome.replace(/\W+/g, "-")}.png`);
+        console.error(`Erro ao verificar ${rotulo}:`, erroEspecialidade.message);
+        if (detalhado) console.error(`  URL no momento do erro: ${page.url()}`);
+        const arquivo = detalhado ? nome.replace(/\W+/g, "-") : `especialidade-${indice + 1}`;
+        await capturarTelaSemDados(page, `erro-${arquivo}.png`);
         // Segue pras próximas especialidades mesmo que esta tenha falhado
       }
     }
