@@ -15,17 +15,21 @@ function resumir(texto) {
   return createHash("sha256").update(texto).digest("hex").slice(0, 16);
 }
 
-export function carregarEstado() {
-  if (!existsSync(CAMINHO_ESTADO)) return {};
+// O caminho entra por parâmetro pro teste poder usar um arquivo temporário em
+// vez do state.json de verdade.
+export function carregarEstado(caminho = CAMINHO_ESTADO) {
+  if (!existsSync(caminho)) return {};
   try {
-    return JSON.parse(readFileSync(CAMINHO_ESTADO, "utf-8"));
+    return JSON.parse(readFileSync(caminho, "utf-8"));
   } catch {
+    // Arquivo corrompido não pode derrubar a execução: começar do zero só faz
+    // as vagas abertas serem avisadas de novo.
     return {};
   }
 }
 
-export function salvarEstado(estado) {
-  writeFileSync(CAMINHO_ESTADO, JSON.stringify(estado, null, 2) + "\n");
+export function salvarEstado(estado, caminho = CAMINHO_ESTADO) {
+  writeFileSync(caminho, JSON.stringify(estado, null, 2) + "\n");
 }
 
 // Identifica cada vaga pra saber se ela já foi notificada antes.
