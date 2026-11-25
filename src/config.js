@@ -45,12 +45,10 @@ function validarLista(lista, origem) {
   return lista;
 }
 
-// A lista de especialidades diz quais exames a pessoa está procurando, então
-// ela não fica versionada. No GitHub Actions vem do secret ESPECIALIDADES; na
-// máquina, de config/especialidades.json, que está no .gitignore. O arquivo de
-// exemplo só existe para o projeto rodar em quem acabou de clonar.
-// Os caminhos entram por parâmetro pro teste poder apontar pra fixtures em vez
-// dos arquivos reais, que mudam de máquina pra máquina.
+// A lista diz quais exames a pessoa procura, então não é versionada. Ordem:
+// secret ESPECIALIDADES, depois config/especialidades.json (no .gitignore) e,
+// por último, o exemplo, pra quem acabou de clonar. Os caminhos são parâmetro
+// pros testes.
 export function carregarEspecialidades(opcoes = {}) {
   const arquivoLocal = opcoes.arquivoLocal ?? ARQUIVO_LOCAL;
   const arquivoExemplo = opcoes.arquivoExemplo ?? ARQUIVO_EXEMPLO;
@@ -99,8 +97,8 @@ export function carregarConfig() {
     // Chave do HMAC que protege o state.json público (veja src/state.js)
     stateKey: obrigatorio("STATE_KEY"),
     especialidades: carregarEspecialidades(),
-    // Registra as vagas sem mandar mensagem. Serve pra primeira execução, com o
-    // state.json vazio, quando tudo que está aberto contaria como novidade.
+    // Registra as vagas sem avisar. Pra primeira execução com o state.json
+    // vazio, quando tudo que está aberto contaria como novidade.
     semAlerta: ligado(process.env.SEM_ALERTA),
   };
 }
