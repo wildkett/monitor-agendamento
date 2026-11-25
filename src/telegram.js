@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kettly Lima
+// SPDX-License-Identifier: MIT
+
 export async function enviarAlertaTelegram({ botToken, chatId, mensagem }) {
   const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
 

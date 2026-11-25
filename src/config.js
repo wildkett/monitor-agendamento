@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kettly Lima
+// SPDX-License-Identifier: MIT
+
 import { readFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";

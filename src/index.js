@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kettly Lima
+// SPDX-License-Identifier: MIT
+
 import { chromium } from "playwright";
 import { carregarConfig } from "./config.js";
 import {

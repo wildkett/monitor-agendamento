@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kettly Lima
+// SPDX-License-Identifier: MIT
+
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { createHash } from "crypto";
 import { fileURLToPath } from "url";

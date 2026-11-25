@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kettly Lima
+// SPDX-License-Identifier: MIT
+
 // Quando uma execução falha, o workflow sobe o screenshot como artifact. Em
 // repositório público qualquer pessoa baixa esse arquivo, e a tela de login
 // mostra nome, matrícula, CPF, nascimento, e-mail e telefone preenchidos.
