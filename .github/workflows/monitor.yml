@@ -56,6 +56,8 @@ jobs:
           # A lista de especialidades também é secret: ela diz quais exames
           # estou procurando e não fica versionada.
           ESPECIALIDADES: ${{ secrets.ESPECIALIDADES }}
+          # Chave do HMAC do state.json. Sem ela os hashes seriam reversíveis.
+          STATE_KEY: ${{ secrets.STATE_KEY }}
           # Vazio quando o gatilho é o cron, porque inputs só existe no dispatch.
           SEM_ALERTA: ${{ inputs.sem_alerta }}
         run: npm start

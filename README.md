@@ -94,6 +94,7 @@ de ambiente obrigatória não definida".
 | `TELEGRAM_BOT_TOKEN` | token do bot (veja abaixo) |
 | `TELEGRAM_CHAT_ID` | seu chat ID (veja abaixo) |
 | `ESPECIALIDADES` | a lista JSON em uma linha só |
+| `STATE_KEY` | chave aleatória que protege o `state.json` (veja abaixo) |
 
 O `ESPECIALIDADES` é o mesmo conteúdo do arquivo local, em uma linha:
 
@@ -134,7 +135,11 @@ ficam de fora de propósito:
   quais exames a pessoa está procurando.
 - **O `state.json`**, que o workflow commita a cada execução, guarda só hashes.
   Ele precisa apenas comparar igualdade pra saber se uma vaga já foi avisada,
-  nunca precisa ler o valor de volta.
+  nunca precisa ler o valor de volta. O hash é HMAC com o secret `STATE_KEY`:
+  nomes de especialidade são poucos e previsíveis, e com SHA-256 puro bastaria
+  testar uma lista deles pra descobrir o que está sendo monitorado. Gere a chave
+  com `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
+  Trocar a chave zera o estado, então rode a execução seguinte com **sem_alerta**.
 
 O screenshot de erro que sobe como artifact passa antes por `src/screenshot.js`,
 que troca o valor dos campos por bolinhas. O que interessa nele é em que tela o

@@ -15,42 +15,44 @@ import {
   salvarEstado,
 } from "../src/state.js";
 
+const SEGREDO = "chave-de-teste";
 const vaga = (data, local) => ({ data, profissional: local });
 
 describe("chaveVaga", () => {
   test("é sempre a mesma pra mesma vaga", () => {
-    const a = chaveVaga(vaga("2026-08-11", "HOSPITAL EXEMPLO"));
-    const b = chaveVaga(vaga("2026-08-11", "HOSPITAL EXEMPLO"));
+    const a = chaveVaga(vaga("2026-08-11", "HOSPITAL EXEMPLO"), SEGREDO);
+    const b = chaveVaga(vaga("2026-08-11", "HOSPITAL EXEMPLO"), SEGREDO);
     assert.equal(a, b);
   });
 
   test("muda quando a data muda", () => {
     assert.notEqual(
-      chaveVaga(vaga("2026-08-11", "HOSPITAL EXEMPLO")),
-      chaveVaga(vaga("2026-08-12", "HOSPITAL EXEMPLO"))
+      chaveVaga(vaga("2026-08-11", "HOSPITAL EXEMPLO"), SEGREDO),
+      chaveVaga(vaga("2026-08-12", "HOSPITAL EXEMPLO"), SEGREDO)
     );
   });
 
   test("muda quando a unidade muda", () => {
     assert.notEqual(
-      chaveVaga(vaga("2026-08-11", "HOSPITAL EXEMPLO")),
-      chaveVaga(vaga("2026-08-11", "UNIDADE CENTRO"))
+      chaveVaga(vaga("2026-08-11", "HOSPITAL EXEMPLO"), SEGREDO),
+      chaveVaga(vaga("2026-08-11", "UNIDADE CENTRO"), SEGREDO)
     );
   });
 
   test("ignora o horário, que só é buscado depois", () => {
-    const sem = chaveVaga(vaga("2026-08-11", "HOSPITAL EXEMPLO"));
-    const com = chaveVaga({ ...vaga("2026-08-11", "HOSPITAL EXEMPLO"), hora: "07:30" });
+    const sem = chaveVaga(vaga("2026-08-11", "HOSPITAL EXEMPLO"), SEGREDO);
+    const comHora = { ...vaga("2026-08-11", "HOSPITAL EXEMPLO"), hora: "07:30" };
+    const com = chaveVaga(comHora, SEGREDO);
     assert.equal(sem, com);
   });
 
   test("aceita vaga sem unidade", () => {
-    assert.equal(typeof chaveVaga({ data: "2026-08-11" }), "string");
+    assert.equal(typeof chaveVaga({ data: "2026-08-11" }, SEGREDO), "string");
   });
 
   // O state.json vai pro repositório público a cada execução.
   test("não deixa o texto original aparecer", () => {
-    const chave = chaveVaga(vaga("2026-08-11", "HOSPITAL EXEMPLO"));
+    const chave = chaveVaga(vaga("2026-08-11", "HOSPITAL EXEMPLO"), SEGREDO);
     assert.doesNotMatch(chave, /HOSPITAL|2026/);
     assert.match(chave, /^[0-9a-f]+$/);
   });
@@ -60,37 +62,35 @@ describe("filtrarNovas", () => {
   const vagas = [vaga("2026-08-11", "HOSPITAL EXEMPLO"), vaga("2026-08-12", "UNIDADE CENTRO")];
 
   test("com estado vazio, tudo é novo", () => {
-    assert.equal(filtrarNovas({}, "CARDIOLOGIA", vagas).length, 2);
+    assert.equal(filtrarNovas({}, "CARDIOLOGIA", vagas, SEGREDO).length, 2);
   });
 
   test("depois de registrar, nada é novo", () => {
-    const estado = atualizarEstado({}, "CARDIOLOGIA", vagas);
-    assert.equal(filtrarNovas(estado, "CARDIOLOGIA", vagas).length, 0);
+    const estado = atualizarEstado({}, "CARDIOLOGIA", vagas, SEGREDO);
+    assert.equal(filtrarNovas(estado, "CARDIOLOGIA", vagas, SEGREDO).length, 0);
   });
 
   test("uma vaga inédita no meio das conhecidas", () => {
-    const estado = atualizarEstado({}, "CARDIOLOGIA", vagas);
-    const novas = filtrarNovas(estado, "CARDIOLOGIA", [
-      ...vagas,
-      vaga("2026-08-20", "HOSPITAL EXEMPLO"),
-    ]);
+    const estado = atualizarEstado({}, "CARDIOLOGIA", vagas, SEGREDO);
+    const comInedita = [...vagas, vaga("2026-08-20", "HOSPITAL EXEMPLO")];
+    const novas = filtrarNovas(estado, "CARDIOLOGIA", comInedita, SEGREDO);
     assert.equal(novas.length, 1);
     assert.equal(novas[0].data, "2026-08-20");
   });
 
   test("vaga conhecida não volta a avisar por ter ganhado horário", () => {
-    const estado = atualizarEstado({}, "CARDIOLOGIA", vagas);
+    const estado = atualizarEstado({}, "CARDIOLOGIA", vagas, SEGREDO);
     const comHorario = vagas.map((v) => ({ ...v, hora: "07:30" }));
-    assert.equal(filtrarNovas(estado, "CARDIOLOGIA", comHorario).length, 0);
+    assert.equal(filtrarNovas(estado, "CARDIOLOGIA", comHorario, SEGREDO).length, 0);
   });
 
   test("uma especialidade não enxerga o estado da outra", () => {
-    const estado = atualizarEstado({}, "CARDIOLOGIA", vagas);
-    assert.equal(filtrarNovas(estado, "DERMATOLOGIA", vagas).length, 2);
+    const estado = atualizarEstado({}, "CARDIOLOGIA", vagas, SEGREDO);
+    assert.equal(filtrarNovas(estado, "DERMATOLOGIA", vagas, SEGREDO).length, 2);
   });
 
   test("lista vazia devolve lista vazia", () => {
-    assert.deepEqual(filtrarNovas({}, "CARDIOLOGIA", []), []);
+    assert.deepEqual(filtrarNovas({}, "CARDIOLOGIA", [], SEGREDO), []);
   });
 });
 
@@ -99,17 +99,17 @@ describe("atualizarEstado", () => {
     const vagaA = vaga("2026-08-11", "HOSPITAL EXEMPLO");
     const vagaB = vaga("2026-08-12", "UNIDADE CENTRO");
 
-    const estado = atualizarEstado({}, "CARDIOLOGIA", [vagaA, vagaB]);
-    atualizarEstado(estado, "CARDIOLOGIA", [vagaB]);
+    const estado = atualizarEstado({}, "CARDIOLOGIA", [vagaA, vagaB], SEGREDO);
+    atualizarEstado(estado, "CARDIOLOGIA", [vagaB], SEGREDO);
 
     // A vaga que saiu do site é esquecida. Se ela reabrir, avisa de novo, que
     // é o comportamento que eu quero.
-    assert.equal(filtrarNovas(estado, "CARDIOLOGIA", [vagaA]).length, 1);
-    assert.equal(filtrarNovas(estado, "CARDIOLOGIA", [vagaB]).length, 0);
+    assert.equal(filtrarNovas(estado, "CARDIOLOGIA", [vagaA], SEGREDO).length, 1);
+    assert.equal(filtrarNovas(estado, "CARDIOLOGIA", [vagaB], SEGREDO).length, 0);
   });
 
   test("não guarda a especialidade em texto puro", () => {
-    const estado = atualizarEstado({}, "CARDIOLOGIA", [vaga("2026-08-11", "X")]);
+    const estado = atualizarEstado({}, "CARDIOLOGIA", [vaga("2026-08-11", "X")], SEGREDO);
     assert.equal(Object.keys(estado).includes("CARDIOLOGIA"), false);
     assert.equal(Object.keys(estado).length, 1);
   });
@@ -129,7 +129,8 @@ describe("carregarEstado e salvarEstado", () => {
   });
 
   test("o que foi salvo é o que volta", () => {
-    const estado = atualizarEstado({}, "CARDIOLOGIA", [vaga("2026-08-11", "HOSPITAL EXEMPLO")]);
+    const vagas = [vaga("2026-08-11", "HOSPITAL EXEMPLO")];
+    const estado = atualizarEstado({}, "CARDIOLOGIA", vagas, SEGREDO);
     salvarEstado(estado, arquivo);
     assert.deepEqual(carregarEstado(arquivo), estado);
   });

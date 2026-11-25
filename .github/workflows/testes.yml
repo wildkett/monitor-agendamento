@@ -6,6 +6,11 @@ on:
   pull_request:
   workflow_dispatch: {}
 
+# Os testes só leem o código. Sem isto o job herda o token padrão do repositório,
+# que pode ter escrita.
+permissions:
+  contents: read
+
 concurrency:
   group: testes-${{ github.ref }}
   cancel-in-progress: true

@@ -21,6 +21,7 @@ const OBRIGATORIAS = {
   TELEFONE: "11999999999",
   TELEGRAM_BOT_TOKEN: "123:abc",
   TELEGRAM_CHAT_ID: "456",
+  STATE_KEY: "chave-de-teste",
 };
 
 const TODAS = [...Object.keys(OBRIGATORIAS), "ESPECIALIDADES", "SEM_ALERTA"];

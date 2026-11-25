@@ -96,6 +96,8 @@ export function carregarConfig() {
     telefone: obrigatorio("TELEFONE"),
     telegramBotToken: obrigatorio("TELEGRAM_BOT_TOKEN"),
     telegramChatId: obrigatorio("TELEGRAM_CHAT_ID"),
+    // Chave do HMAC que protege o state.json público (veja src/state.js)
+    stateKey: obrigatorio("STATE_KEY"),
     especialidades: carregarEspecialidades(),
     // Registra as vagas sem mandar mensagem. Serve pra primeira execução, com o
     // state.json vazio, quando tudo que está aberto contaria como novidade.
