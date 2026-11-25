@@ -9,29 +9,22 @@ import { dirname, join } from "path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CAMINHO_ESTADO = join(__dirname, "..", "state.json");
 
-// O workflow commita o state.json de volta a cada execução, então o conteúdo
-// dele fica visível pra quem abrir o repositório. Em texto puro isso mostrava a
-// especialidade, a data e a unidade de cada vaga. Aqui só entra o hash: pra
-// saber se uma vaga já foi avisada basta comparar igualdade, nunca precisei ler
-// o valor de volta.
-//
-// O hash é HMAC com o secret STATE_KEY, e não SHA-256 puro. Nomes de
-// especialidade e datas são poucos e previsíveis: com hash puro, bastava testar
-// uma lista de especialidades comuns pra descobrir o que estava sendo monitorado.
+// O state.json é commitado no repositório público, então guarda só hashes: pra
+// saber se uma vaga já foi avisada basta comparar igualdade. É HMAC e não
+// SHA-256 puro porque nomes de especialidade são poucos e previsíveis, e o hash
+// puro se reverte testando uma lista deles.
 function resumir(texto, segredo) {
   if (!segredo) throw new Error("STATE_KEY não definida: sem ela o estado não é protegido.");
   return createHmac("sha256", segredo).update(texto).digest("hex").slice(0, 16);
 }
 
-// O caminho entra por parâmetro pro teste poder usar um arquivo temporário em
-// vez do state.json de verdade.
+// O caminho é parâmetro pros testes usarem um arquivo temporário.
 export function carregarEstado(caminho = CAMINHO_ESTADO) {
   if (!existsSync(caminho)) return {};
   try {
     return JSON.parse(readFileSync(caminho, "utf-8"));
   } catch {
-    // Arquivo corrompido não pode derrubar a execução: começar do zero só faz
-    // as vagas abertas serem avisadas de novo.
+    // Arquivo corrompido não derruba a execução: no pior caso, avisa de novo.
     return {};
   }
 }
@@ -40,11 +33,8 @@ export function salvarEstado(estado, caminho = CAMINHO_ESTADO) {
   writeFileSync(caminho, JSON.stringify(estado, null, 2) + "\n");
 }
 
-// Identifica cada vaga pra saber se ela já foi notificada antes.
-//
-// O horário fica de fora de propósito. Ele só é buscado depois, e só pras vagas
-// novas, porque custa uma navegação a mais por vaga. Se entrasse aqui, toda
-// vaga conhecida mudaria de identidade ao ganhar horário e seria avisada de novo.
+// O horário fica fora da chave: ele só é buscado depois, pras vagas novas. Se
+// entrasse, a vaga mudaria de chave ao ganhar horário e seria avisada de novo.
 export function chaveVaga(vaga, segredo) {
   return resumir(`${vaga.data}|${vaga.profissional ?? ""}`, segredo);
 }

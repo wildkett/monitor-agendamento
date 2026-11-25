@@ -5,9 +5,8 @@
 // acento (Março), por isso [a-zA-ZçÇãÃ]+ em vez de \w+.
 const REGEX_DATA = /(\d{1,2}) de ([a-zA-ZçÇãÃ]+) de (\d{4})/;
 
-// Nome de especialidade e de unidade ficam fora das mensagens: elas vão pro log
-// do Actions, que é público. Quem chama já identifica qual especialidade era.
-// Localmente, com DEBUG_VAGAS, o nome volta pra facilitar a investigação.
+// Nome de especialidade e de unidade só entram nas mensagens com DEBUG_VAGAS
+// (uso local). O log do Actions é público.
 const DETALHADO = Boolean(process.env.DEBUG_VAGAS);
 
 /**
@@ -22,11 +21,9 @@ export async function verificarEspecialidade(page, especialidadeConfig, opcoes =
   await page.waitForLoadState('networkidle');
 
   if (!viaModal) {
-    // Tento a correspondência exata primeiro. O Playwright casa por trecho por
-    // padrão, então "CARDIOLOGIA" bateria também em "CARDIOLOGIA PEDIATRICA".
-    // Além de poder clicar na opção errada, casar com duas faz o strict mode
-    // recusar a ação, e era assim que uma especialidade que existia na lista
-    // acabava reportada como ausente.
+    // Exata primeiro: por padrão o Playwright casa por trecho, e "CARDIOLOGIA"
+    // bateria também em "CARDIOLOGIA PEDIATRICA". Casar com duas faz o strict
+    // mode recusar o clique e a especialidade parecer ausente.
     const exata = page.getByRole('option', { name: nome, exact: true });
     const parcial = page.getByRole('option', { name: nome });
 
@@ -61,9 +58,8 @@ export async function verificarEspecialidade(page, especialidadeConfig, opcoes =
   await page.getByRole('button', { name: 'Avançar' }).click();
   await page.waitForLoadState('networkidle');
 
-  // A grade de datas chega por AJAX e o networkidle às vezes dispara antes dela
-  // renderizar. Esperar o container evita ler a página vazia e concluir errado
-  // que não tem vaga nenhuma.
+  // A grade chega por AJAX, às vezes depois do networkidle. Sem esperar por ela,
+  // a página seria lida vazia e daria "nenhuma vaga" por engano.
   const grade = page.locator('[id="frmInicial:pnlUniDatas_content"]').first();
   const temGrade = await grade
     .waitFor({ state: 'visible', timeout: 15000 })
@@ -71,9 +67,8 @@ export async function verificarEspecialidade(page, especialidadeConfig, opcoes =
     .catch(() => false);
 
   if (!temGrade) {
-    // Sem a grade são dois casos bem diferentes: ou não tem agenda pra essa
-    // especialidade, ou o "Avançar" não saiu do lugar. Separar os dois evita
-    // registrar "nenhuma vaga" quando na verdade o fluxo travou.
+    // Sem grade: ou não tem agenda, ou o "Avançar" não saiu do lugar. O segundo
+    // caso é erro, não "nenhuma vaga".
     const aindaNaSelecao = await page
       .locator('[id="frmInicial:group"]')
       .isVisible()
@@ -95,8 +90,7 @@ export async function verificarEspecialidade(page, especialidadeConfig, opcoes =
 
   // Cada linha traz a data e, abaixo, as unidades:
   //   "Segunda-feira , 10 de Agosto de 2026\n\nUNIDADE CENTRO\nRUA X, 220"
-  // Ler o innerText inteiro saiu mais estável do que caçar span por span,
-  // porque a página tem dezenas de <tr> aninhados e sem estrutura uniforme.
+  // Leio o innerText inteiro: os <tr> são aninhados e sem estrutura uniforme.
   const linhas = await page.locator('tr').all();
 
   for (const linha of linhas) {
@@ -149,27 +143,18 @@ export async function verificarEspecialidade(page, especialidadeConfig, opcoes =
     console.log(`  [debug] ${linhas.length} linha(s) na tabela, ${vagasNoPeriodo.length} no período`);
   }
 
-  // Não uso o "Voltar para a tela inicial" aqui: ele devolve pro formulário de
-  // matrícula e encerra a sessão. Quem chama refaz o login pra próxima.
   return vagasNoPeriodo;
 }
 
 /**
- * Entra na unidade da vaga e lê os horários livres.
+ * Entra na unidade da vaga e lê os horários livres. A grade de datas não tem
+ * hora: ela só aparece na tela da unidade. Precisa ser chamada com a página na
+ * grade de datas.
  *
- * O horário não existe na grade de datas: o link da unidade carrega só
- * `wr('44,1625,2026-08-10')`, sem hora. Ele aparece na tela seguinte, em botões
- * tipo `whrora('36,127546,2026-08-29,07:30')`. Por isso só busco pras vagas
- * novas, varrer as 30 conhecidas a cada ciclo seria carga à toa.
- *
- * Precisa ser chamada com a página ainda na grade de datas.
- *
- * @returns {Promise<string[]>} horários no formato "07:30", ou [] se não deu
- *   pra abrir a unidade (o alerta vai sem horário em vez de falhar).
+ * @returns {Promise<string[]>} horários no formato "07:30"
  */
 export async function buscarHorarios(page, vaga) {
-  // vaga.profissional é "UNIDADE CENTRO — RUA X, 220", mas o link traz só o
-  // nome da unidade, antes do travessão.
+  // O link traz só o nome da unidade, sem o endereço depois do travessão.
   const unidade = vaga.profissional.split(' — ')[0].trim();
 
   const linhaDaData = page
@@ -182,8 +167,6 @@ export async function buscarHorarios(page, vaga) {
     .first();
 
   if ((await link.count()) === 0) {
-    // Mensagem detalhada de propósito: é a única pista de por que a busca não
-    // aconteceu, e separa "a grade sumiu" de "o link mudou".
     throw new Error(
       `link da unidade${DETALHADO ? ` "${unidade}"` : ""} não encontrado na linha ` +
         `de ${vaga.data} (grade visível: ${await naGradeDeDatas(page)})`
@@ -193,9 +176,8 @@ export async function buscarHorarios(page, vaga) {
   await link.click();
   await page.waitForLoadState('networkidle');
 
-  // Os horários são botões cujo rótulo é só "HH:MM". Mirar direto neles em vez
-  // de varrer todos os botões me deixa esperar a renderização, porque o
-  // networkidle às vezes dispara antes da grade de horários existir.
+  // Os horários são botões com rótulo "HH:MM". Espero por eles porque o
+  // networkidle às vezes dispara antes de renderizarem.
   const botoesHorario = page.getByRole('button', { name: /^\d{1,2}:\d{2}$/ });
   await botoesHorario
     .first()
@@ -204,9 +186,8 @@ export async function buscarHorarios(page, vaga) {
 
   const horarios = (await botoesHorario.allInnerTexts()).map((t) => t.trim());
 
-  // Só tento voltar depois de já ter os horários na mão, e sem propagar o erro:
-  // se o retorno falhar, o que foi lido continua valendo. O index.js percebe a
-  // falha pelo naGradeDeDatas e para de buscar as próximas.
+  // Falha ao voltar não descarta os horários lidos. O index.js percebe pelo
+  // naGradeDeDatas e para de buscar as próximas.
   await voltarParaGrade(page).catch((erro) => {
     console.log(`  (falha ao voltar: ${erro.message})`);
   });
@@ -216,18 +197,16 @@ export async function buscarHorarios(page, vaga) {
 
 /** Da tela de horários de volta pra grade de datas. */
 async function voltarParaGrade(page) {
-  // O rótulo é "Voltar para a tela ANTERIOR", perigosamente parecido com
-  // "Voltar para a tela INICIAL", que reinicia a sessão e derruba o login. Por
-  // isso o nome vai completo: um "Voltar" solto casaria com os dois.
+  // Nome completo de propósito: "Voltar para a tela inicial" fica na mesma tela
+  // e derruba a sessão.
   const voltar = page.getByRole('link', { name: 'Voltar para a tela anterior' });
   const quantos = await voltar.count().catch(() => 0);
 
   if (quantos > 0) {
     await voltar.first().click({ timeout: 10000 }).catch(() => {});
 
-    // É um ui-commandlink: dispara AJAX e troca o painel sem recarregar a
-    // página. O networkidle termina antes disso, então espero a grade
-    // reaparecer em vez de conferir na hora.
+    // O link troca o painel por AJAX, depois do networkidle. Espero a grade
+    // reaparecer.
     const voltou = await page
       .getByRole('link', { name: /Botão de Seleção de Unidade/ })
       .first()
@@ -269,9 +248,8 @@ function escaparRegex(texto) {
 
 /** A grade continua acessível? Uso pra saber se o "Voltar" funcionou. */
 export async function naGradeDeDatas(page) {
-  // Identifico a grade pelos links de unidade e não pelo id do container: os
-  // ids são gerados pelo JSF e mudam conforme o fluxo (pnlUniDatas_content num
-  // caso, j_idt100:0:dtgrd_content noutro). Os links estão sempre lá.
+  // Pelos links de unidade, não pelo id do container: o JSF gera ids
+  // diferentes conforme o fluxo.
   const links = page.getByRole('link', { name: /Botão de Seleção de Unidade/ });
   return (await links.count().catch(() => 0)) > 0;
 }

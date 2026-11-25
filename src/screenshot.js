@@ -1,12 +1,9 @@
 // Copyright (c) 2026 Kettly Lima
 // SPDX-License-Identifier: MIT
 
-// Quando uma execução falha, o workflow sobe o screenshot como artifact. Em
-// repositório público qualquer pessoa baixa esse arquivo, e a tela de login
-// mostra nome, matrícula, CPF, nascimento, e-mail e telefone preenchidos.
-//
-// Então antes de capturar eu troco o valor dos campos por bolinhas. O que
-// interessa no screenshot é em que tela o fluxo parou, e isso continua visível.
+// O screenshot de erro vira artifact público e a tela de login mostra os dados
+// pessoais preenchidos. Troco o valor dos campos por bolinhas antes de
+// capturar: o que importa é em que tela o fluxo parou.
 export async function capturarTelaSemDados(page, caminho) {
   await page
     .evaluate(() => {

@@ -30,11 +30,9 @@ async function main() {
   });
   const page = await browser.newPage();
 
-  // O nome da especialidade não entra no log: ele conta que exame a pessoa está
-  // procurando, e o log do Actions é público em repositório público. O
-  // mascaramento automático de secrets não cobre isso, porque ele esconde o
-  // valor inteiro de ESPECIALIDADES, e cada nome é só um pedaço dele. Com
-  // DEBUG_VAGAS, que é uso local, o nome volta a aparecer.
+  // O nome da especialidade não vai pro log, que é público. O mascaramento de
+  // secrets esconde o ESPECIALIDADES inteiro, mas não cada nome isolado.
+  // Com DEBUG_VAGAS (uso local) o nome aparece.
   const detalhado = Boolean(process.env.DEBUG_VAGAS);
   const total = config.especialidades.length;
 
@@ -46,9 +44,8 @@ async function main() {
       const rotulo = detalhado ? `"${nome}"` : `especialidade ${indice + 1} de ${total}`;
 
       try {
-        // Cada especialidade recomeça do login. Na tela da agenda só existe
-        // "Voltar para a tela inicial", que derruba a sessão e volta pro
-        // formulário de matrícula. Não tem caminho de volta pro dropdown.
+        // Cada especialidade recomeça do login: da agenda não há caminho de
+        // volta pro dropdown, só pra tela inicial, que derruba a sessão.
         await login(page, config);
 
         // O login deixa o modal aberto de propósito: parte das especialidades
@@ -69,9 +66,9 @@ async function main() {
           `Verificando ${rotulo} (${especialidadeConfig.dataInicio} a ${especialidadeConfig.dataFim})`
         );
 
-        // Aparecer no modal não quer dizer que sumiu do dropdown: CARDIOLOGIA
-        // está nos dois. O dropdown é a busca geral e tem preferência, o modal
-        // é só retorno com um médico específico.
+        // Uma especialidade pode estar no modal e no dropdown ao mesmo tempo. O
+        // dropdown é a busca geral e tem preferência; o modal é retorno com um
+        // médico específico.
         let vagas;
         await fecharModal(page);
 
@@ -119,8 +116,6 @@ async function main() {
           console.log(`  -> ${comHorario} de ${vagasNovas.length} vaga(s) com horário`);
 
           if (config.semAlerta) {
-            // Com o state.json vazio, tudo que está aberto hoje conta como novo
-            // e viraria uma enxurrada de mensagem. Aqui só registra.
             console.log(`  (SEM_ALERTA: ${vagasNovas.length} vaga(s) registrada(s) sem avisar)`);
           } else {
             const mensagem = formatarMensagemVaga({

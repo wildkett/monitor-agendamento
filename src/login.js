@@ -34,16 +34,14 @@ export async function login(page, config) {
   await page.getByRole("button", { name: "Avançar" }).click();
   await page.waitForLoadState("networkidle");
 
-  // O modal de encaminhamentos/retornos fica ABERTO de propósito. As
-  // especialidades que aparecem nele saem do dropdown e só dá pra agendar pelo
-  // botão daqui. Quem fecha é o index.js, depois de tratar essas.
+  // O modal de encaminhamentos fica aberto de propósito: o index.js lê as
+  // especialidades dele antes de fechar.
   await modal(page)
     .waitFor({ state: "visible", timeout: 10000 })
     .catch(() => {}); // sem pendências o modal nem abre
 
-  // Se algum campo obrigatório não passa na validação, o site simplesmente não
-  // sai da tela inicial. Falhar aqui com mensagem clara é melhor do que estourar
-  // timeout lá na frente procurando o dropdown.
+  // Campo recusado na validação deixa o site parado na tela inicial, sem erro.
+  // Falho aqui em vez de estourar timeout depois, procurando o dropdown.
   if (!(await modalAberto(page))) {
     const dropdown = page.locator('[id="frmInicial:group"]');
     await dropdown.waitFor({ state: "visible", timeout: 15000 }).catch(() => {
@@ -68,9 +66,8 @@ export async function modalAberto(page) {
     .catch(() => false);
 }
 
-// Lê as especialidades do modal, tanto as "Solicitações de Encaminhamento"
-// quanto o "Acompanhamento Médico (Retornos)". Preciso dessa lista porque essas
-// especialidades somem do dropdown e o botão daqui vira o único caminho.
+// Especialidades do modal (encaminhamentos e retornos). Elas somem do dropdown,
+// então o botão "Agendar" daqui é o único caminho até elas.
 export async function listarEncaminhamentos(page) {
   if (!(await modalAberto(page))) return [];
 
@@ -111,8 +108,7 @@ export async function agendarPeloModal(page, nome) {
   }
 
   if (!alvo) {
-    // Sem o nome na mensagem: ela vai pro log do Actions, que é público. Quem
-    // chama já identifica de qual especialidade se trata.
+    // Sem o nome: a mensagem vai pro log público do Actions.
     throw new Error("a especialidade não foi encontrada entre as linhas do modal.");
   }
 
@@ -129,19 +125,10 @@ function somenteDigitos(valor) {
   return valor.replace(/\D/g, "");
 }
 
-// Matrícula, CPF e Telefone têm máscara de entrada, e ela deu trabalho de dois
-// jeitos diferentes:
-//
-//   - o fill() joga o texto de uma vez e a máscara descarta, o campo fica vazio
-//     (foi o que aconteceu com a matrícula na execução do GitHub);
-//   - se a digitação começa antes do JS da máscara terminar de carregar, ela
-//     reposiciona o cursor no meio e os dígitos saem fora de ordem. Na nuvem
-//     isso jogava o primeiro dígito do CPF pro fim e invalidava o número.
-//
-// Forçar a posição do cursor não resolve, porque o campo já vem com o gabarito
-// inteiro ("__.___.___-__") e a máscara controla o cursor sozinha. O que
-// funcionou foi digitar, conferir e repetir se não bateu, o que também cobre a
-// demora de carregamento sem depender da velocidade da máquina.
+// Matrícula, CPF e Telefone têm máscara de entrada. O fill() é descartado pela
+// máscara, e digitar antes do JS dela carregar embaralha os dígitos. Forçar o
+// cursor não resolve: a máscara controla ele sozinha. Então digito, confiro e
+// repito se não bateu, sem depender da velocidade da máquina.
 async function preencherComMascara(campo, valor, rotulo) {
   const digitos = somenteDigitos(valor);
   const TENTATIVAS = 3;
@@ -161,9 +148,8 @@ async function preencherComMascara(campo, valor, rotulo) {
     await campo.page().waitForTimeout(1000 * tentativa);
   }
 
-  // A mensagem descreve o sintoma sem mostrar o valor. Ela vai pro log do
-  // Actions, e o mascaramento automático de secrets só cobre o texto idêntico
-  // ao cadastrado: o valor embaralhado pela máscara não casaria e apareceria.
+  // Descreve o sintoma sem mostrar o valor: o mascaramento de secrets do Actions
+  // só cobre o texto idêntico, e o valor embaralhado apareceria no log.
   const diagnostico =
     ultimoResultado.length === 0
       ? "o campo ficou vazio"
@@ -199,7 +185,6 @@ async function esperarPreenchido(campo, rotulo) {
 export async function fecharModal(page) {
   if (!(await modalAberto(page))) return;
 
-  // O "X" da barra de título é um <a role="button" aria-label="Close">
   await modal(page).locator("a.ui-dialog-titlebar-close").click();
 
   await page
