@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Kettly Lima
+// SPDX-License-Identifier: MIT
+
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { createHash } from "crypto";
+import { createHmac } from "crypto";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
@@ -11,8 +14,13 @@ const CAMINHO_ESTADO = join(__dirname, "..", "state.json");
 // especialidade, a data e a unidade de cada vaga. Aqui só entra o hash: pra
 // saber se uma vaga já foi avisada basta comparar igualdade, nunca precisei ler
 // o valor de volta.
-function resumir(texto) {
-  return createHash("sha256").update(texto).digest("hex").slice(0, 16);
+//
+// O hash é HMAC com o secret STATE_KEY, e não SHA-256 puro. Nomes de
+// especialidade e datas são poucos e previsíveis: com hash puro, bastava testar
+// uma lista de especialidades comuns pra descobrir o que estava sendo monitorado.
+function resumir(texto, segredo) {
+  if (!segredo) throw new Error("STATE_KEY não definida: sem ela o estado não é protegido.");
+  return createHmac("sha256", segredo).update(texto).digest("hex").slice(0, 16);
 }
 
 // O caminho entra por parâmetro pro teste poder usar um arquivo temporário em
@@ -37,16 +45,16 @@ export function salvarEstado(estado, caminho = CAMINHO_ESTADO) {
 // O horário fica de fora de propósito. Ele só é buscado depois, e só pras vagas
 // novas, porque custa uma navegação a mais por vaga. Se entrasse aqui, toda
 // vaga conhecida mudaria de identidade ao ganhar horário e seria avisada de novo.
-export function chaveVaga(vaga) {
-  return resumir(`${vaga.data}|${vaga.profissional ?? ""}`);
+export function chaveVaga(vaga, segredo) {
+  return resumir(`${vaga.data}|${vaga.profissional ?? ""}`, segredo);
 }
 
-export function filtrarNovas(estado, especialidade, vagasEncontradas) {
-  const jaNotificadas = new Set(estado[resumir(especialidade)] ?? []);
-  return vagasEncontradas.filter((v) => !jaNotificadas.has(chaveVaga(v)));
+export function filtrarNovas(estado, especialidade, vagasEncontradas, segredo) {
+  const jaNotificadas = new Set(estado[resumir(especialidade, segredo)] ?? []);
+  return vagasEncontradas.filter((v) => !jaNotificadas.has(chaveVaga(v, segredo)));
 }
 
-export function atualizarEstado(estado, especialidade, vagasEncontradas) {
-  estado[resumir(especialidade)] = vagasEncontradas.map(chaveVaga);
+export function atualizarEstado(estado, especialidade, vagasEncontradas, segredo) {
+  estado[resumir(especialidade, segredo)] = vagasEncontradas.map((v) => chaveVaga(v, segredo));
   return estado;
 }

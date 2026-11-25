@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kettly Lima
+// SPDX-License-Identifier: MIT
+
 import { chromium } from "playwright";
 import { carregarConfig } from "./config.js";
 import {
@@ -84,7 +87,7 @@ async function main() {
           vagas = await verificarEspecialidade(page, especialidadeConfig, { viaModal: true });
         }
 
-        const vagasNovas = filtrarNovas(estado, nome, vagas);
+        const vagasNovas = filtrarNovas(estado, nome, vagas, config.stateKey);
         console.log(`  -> ${vagas.length} vaga(s) no período, ${vagasNovas.length} nova(s)`);
 
         // Só as novas ganham horário: cada uma custa entrar na unidade e voltar.
@@ -133,7 +136,7 @@ async function main() {
           }
         }
 
-        atualizarEstado(estado, nome, vagas);
+        atualizarEstado(estado, nome, vagas, config.stateKey);
       } catch (erroEspecialidade) {
         console.error(`Erro ao verificar ${rotulo}:`, erroEspecialidade.message);
         if (detalhado) console.error(`  URL no momento do erro: ${page.url()}`);

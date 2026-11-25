@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kettly Lima
+// SPDX-License-Identifier: MIT
+
 export async function enviarAlertaTelegram({ botToken, chatId, mensagem }) {
   const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
 
@@ -18,18 +21,26 @@ export async function enviarAlertaTelegram({ botToken, chatId, mensagem }) {
   }
 }
 
+// A mensagem vai com parse_mode HTML e boa parte do texto vem lido do site. Um
+// "<" ou "&" no nome de uma unidade faria o Telegram recusar a mensagem inteira,
+// e o alerta da vaga se perderia.
+function escaparHtml(texto) {
+  return String(texto).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 export function formatarMensagemVaga({ especialidade, vagas, urlAgenda }) {
   const linhas = vagas
     .map((v) => {
       const [ano, mes, dia] = v.data.split("-");
       const quando = v.hora ? `${dia}/${mes} às ${v.hora}` : `${dia}/${mes}/${ano}`;
-      return `• <b>${quando}</b>\n  ${v.profissional ?? "local não informado"}`;
+      const local = v.profissional ?? "local não informado";
+      return `• <b>${escaparHtml(quando)}</b>\n  ${escaparHtml(local)}`;
     })
     .join("\n");
 
   return (
-    `🩺 <b>OLHA A VAAAGAAA: ${especialidade}</b>\n\n` +
+    `🩺 <b>OLHA A VAAAGAAA: ${escaparHtml(especialidade)}</b>\n\n` +
     `${linhas}\n\n` +
-    `CLICA AÍ E AGENDA LOGO: ${urlAgenda}`
+    `CLICA AÍ E AGENDA LOGO: ${escaparHtml(urlAgenda)}`
   );
 }

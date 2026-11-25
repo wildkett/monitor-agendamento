@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kettly Lima
+// SPDX-License-Identifier: MIT
+
 import { test, describe, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -18,6 +21,7 @@ const OBRIGATORIAS = {
   TELEFONE: "11999999999",
   TELEGRAM_BOT_TOKEN: "123:abc",
   TELEGRAM_CHAT_ID: "456",
+  STATE_KEY: "chave-de-teste",
 };
 
 const TODAS = [...Object.keys(OBRIGATORIAS), "ESPECIALIDADES", "SEM_ALERTA"];

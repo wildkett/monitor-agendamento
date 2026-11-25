@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kettly Lima
+// SPDX-License-Identifier: MIT
+
 // "Segunda-feira , 10 de Agosto de 2026". O mês vem por extenso e pode ter
 // acento (Março), por isso [a-zA-ZçÇãÃ]+ em vez de \w+.
 const REGEX_DATA = /(\d{1,2}) de ([a-zA-ZçÇãÃ]+) de (\d{4})/;

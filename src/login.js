@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Kettly Lima
+// SPDX-License-Identifier: MIT
+
 export async function login(page, config) {
   await page.goto(config.agendaUrl, { waitUntil: "networkidle" });
 
